@@ -2,3 +2,14 @@
 /AUTHENTICATION.md
 /dockercommands.txt
 /DOCKER_SETUP.md
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Backend environment files
+backend/.env
+
+# Client environment files
+client/.env
