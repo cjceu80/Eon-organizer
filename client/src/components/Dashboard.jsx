@@ -1,6 +1,8 @@
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import './Dashboard.css';
+import WorldsList from './WorldsList';
+import { Box, Container, Typography, Button, AppBar, Toolbar } from '@mui/material';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -12,27 +14,34 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="dashboard">
-      <div className="dashboard-header">
-        <h1>Welcome, {user?.username}!</h1>
-        <button onClick={handleLogout} className="logout-button">
-          Logout
-        </button>
-      </div>
-      
-      <div className="dashboard-content">
-        <div className="user-info">
-          <h2>User Information</h2>
-          <p><strong>Username:</strong> {user?.username}</p>
-          <p><strong>Email:</strong> {user?.email}</p>
-        </div>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <AppBar position="static">
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Eon Organizer
+          </Typography>
+          <Typography variant="body1" sx={{ mr: 2 }}>
+            {user?.username}
+          </Typography>
+          <Button
+            color="inherit"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+          >
+            Logout
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box mb={4}>
+          <Typography variant="h3" component="h1" gutterBottom>
+            Welcome, {user?.username}!
+          </Typography>
+        </Box>
         
-        <div className="dashboard-card">
-          <h3>Eon Organizer</h3>
-          <p>Your authenticated dashboard. Start organizing your content here.</p>
-        </div>
-      </div>
-    </div>
+        <WorldsList />
+      </Container>
+    </Box>
   );
 }
-

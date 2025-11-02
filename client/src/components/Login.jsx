@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
-import './Login.css';
+//import './Login.css';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -63,7 +63,7 @@ export default function Login() {
         </form>
 
         <p className="register-link">
-          Don't have an account? <Link to="/register">Register here</Link>
+          Don&apos;t have an account? <Link to="/register">Register here</Link>
         </p>
       </div>
     </div>

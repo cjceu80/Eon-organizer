@@ -1,12 +1,21 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { ThemeProvider, createTheme } from '@mui/material/styles'
+import CssBaseline from '@mui/material/CssBaseline'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './components/Login'
 import Register from './components/Register'
 import Dashboard from './components/Dashboard'
-import './index.css'
+import WorldDashboard from './components/WorldDashboard'
+//import './index.css'
+
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+  },
+})
 
 const router = createBrowserRouter([
   {
@@ -26,6 +35,14 @@ const router = createBrowserRouter([
     )
   },
   {
+    path: "/world/:worldId",
+    element: (
+      <ProtectedRoute>
+        <WorldDashboard />
+      </ProtectedRoute>
+    )
+  },
+  {
     path: "*",
     element: <div>404 - Page Not Found</div>
   }
@@ -33,8 +50,11 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

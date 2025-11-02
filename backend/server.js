@@ -3,6 +3,9 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
+import worldRoutes from './routes/worlds.js';
+import characterRoutes from './routes/characters.js';
+import inviteRoutes from './routes/invites.js';
 import { authenticateToken } from './middleware/auth.js';
 
 dotenv.config();
@@ -44,6 +47,9 @@ mongoose.connection.on('connected', () => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/worlds', worldRoutes);
+app.use('/api/characters', characterRoutes);
+app.use('/api/invites', inviteRoutes);
 
 // Basic health check route
 app.get('/api/health', (req, res) => {
