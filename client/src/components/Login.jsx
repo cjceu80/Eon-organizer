@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
-//import './Login.css';
+import {
+  Box,
+  Container,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Link as MuiLink,
+  CircularProgress
+} from '@mui/material';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -22,51 +33,84 @@ export default function Login() {
     if (result.success) {
       navigate('/');
     } else {
-      setError(result.error || 'Login failed');
+      setError(result.error || 'Inloggning misslyckades');
     }
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h2>Login</h2>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="error-message">{error}</div>}
-          
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'background.default',
+        py: 4
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 3 }}>
+              Logga in
+            </Typography>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {error}
+              </Alert>
+            )}
 
-          <button type="submit" disabled={loading} className="submit-button">
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+            <form onSubmit={handleSubmit}>
+              <TextField
+                fullWidth
+                id="email"
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+                margin="normal"
+                autoComplete="email"
+              />
 
-        <p className="register-link">
-          Don&apos;t have an account? <Link to="/register">Register here</Link>
-        </p>
-      </div>
-    </div>
+              <TextField
+                fullWidth
+                id="password"
+                label="Lösenord"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                margin="normal"
+                autoComplete="current-password"
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={loading}
+                sx={{ mt: 3, mb: 2, py: 1.5 }}
+                startIcon={loading ? <CircularProgress size={20} /> : null}
+              >
+                {loading ? 'Loggar in...' : 'Logga in'}
+              </Button>
+            </form>
+
+            <Box textAlign="center" mt={2}>
+              <Typography variant="body2">
+                Har du inget konto?{' '}
+                <MuiLink component={Link} to="/register">
+                  Registrera här
+                </MuiLink>
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
-

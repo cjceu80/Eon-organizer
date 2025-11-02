@@ -41,13 +41,18 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
     container_name: eon-backend
     restart: unless-stopped
     ports:
       - "3000:3000"
+    volumes:
+      # Mount source code for hot-reload in development (writable)
+      - ./backend:/app
+      - /app/node_modules
+      # Exclude node_modules from volume to use container's installed modules
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
       - MONGODB_URI=mongodb://mongodb:27017/eon-organizer
       - JWT_SECRET=${JWT_SECRET:-change-this-to-a-secure-random-string-in-production}
@@ -62,13 +67,25 @@ services:
       timeout: 10s
       retries: 3
 
-  # Frontend Vite Client (served by nginx)
+  # Frontend Vite Client (served by nginx in production, dev server in development)
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile
+      dockerfile: ${CLIENT_DOCKERFILE:-Dockerfile}
     container_name: eon-client
     restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-5173}:5173"
+    volumes:
+      # Mount source code for hot-reload in development (writable)
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+      - ./client/index.html:/app/index.html
+      - ./client/vite.config.js:/app/vite.config.js
+      - ./client/package.json:/app/package.json
+      # Exclude node_modules from volume to use container's installed modules
+    environment:
+      - VITE_API_URL=http://backend:3000
     networks:
       - eon-network
 

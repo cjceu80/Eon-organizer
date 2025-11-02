@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
-import './Login.css';
+import {
+  Box,
+  Container,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Link as MuiLink,
+  CircularProgress
+} from '@mui/material';
 
 export default function Register() {
   const [username, setUsername] = useState('');
@@ -19,12 +30,12 @@ export default function Register() {
 
     // Validation
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError('Lösenorden matchar inte');
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('Lösenordet måste vara minst 6 tecken');
       return;
     }
 
@@ -35,78 +46,114 @@ export default function Register() {
     if (result.success) {
       navigate('/');
     } else {
-      setError(result.error || 'Registration failed');
+      setError(result.error || 'Registreringen misslyckades');
     }
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h2>Register</h2>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="error-message">{error}</div>}
-          
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              minLength={3}
-              disabled={loading}
-            />
-          </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'background.default',
+        py: 4
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 3 }}>
+              Registrera
+            </Typography>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {error}
+              </Alert>
+            )}
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              disabled={loading}
-            />
-          </div>
+            <form onSubmit={handleSubmit}>
+              <TextField
+                fullWidth
+                id="username"
+                label="Användarnamn"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                minLength={3}
+                disabled={loading}
+                margin="normal"
+                autoComplete="username"
+              />
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={6}
-              disabled={loading}
-            />
-          </div>
+              <TextField
+                fullWidth
+                id="email"
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+                margin="normal"
+                autoComplete="email"
+              />
 
-          <button type="submit" disabled={loading} className="submit-button">
-            {loading ? 'Registering...' : 'Register'}
-          </button>
-        </form>
+              <TextField
+                fullWidth
+                id="password"
+                label="Lösenord"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+                margin="normal"
+                autoComplete="new-password"
+                helperText="Minst 6 tecken"
+              />
 
-        <p className="register-link">
-          Already have an account? <Link to="/login">Login here</Link>
-        </p>
-      </div>
-    </div>
+              <TextField
+                fullWidth
+                id="confirmPassword"
+                label="Bekräfta lösenord"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+                margin="normal"
+                autoComplete="new-password"
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={loading}
+                sx={{ mt: 3, mb: 2, py: 1.5 }}
+                startIcon={loading ? <CircularProgress size={20} /> : null}
+              >
+                {loading ? 'Registrerar...' : 'Registrera'}
+              </Button>
+            </form>
+
+            <Box textAlign="center" mt={2}>
+              <Typography variant="body2">
+                Har du redan ett konto?{' '}
+                <MuiLink component={Link} to="/login">
+                  Logga in här
+                </MuiLink>
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
-

@@ -35,11 +35,11 @@ export default function CharactersList() {
         const data = await response.json();
         setCharacters(data.characters || []);
       } else {
-        setError('Failed to load characters');
+        setError('Misslyckades att ladda karaktärer');
       }
     } catch (err) {
       console.error('Error fetching characters:', err);
-      setError('Failed to load characters');
+      setError('Misslyckades att ladda karaktärer');
     } finally {
       setLoading(false);
     }
@@ -70,14 +70,14 @@ export default function CharactersList() {
     <Box>
       <Box mb={3}>
         <Typography variant="h4" component="h2">
-          My Characters
+          Karaktärer
         </Typography>
       </Box>
 
       {characters.length === 0 ? (
         <Box textAlign="center" py={8}>
           <Typography variant="body1" color="text.secondary">
-            You haven&apos;t created any characters yet.
+            Du har inte skapat några karaktärer än.
           </Typography>
         </Box>
       ) : (
@@ -108,7 +108,7 @@ export default function CharactersList() {
                     </Typography>
                     <Box mb={1}>
                       <Typography variant="caption" color="text.secondary">
-                        World: {character.world?.name || 'Unknown'}
+                        Värld: {character.world?.name || 'Okänd'}
                       </Typography>
                     </Box>
                     <Box display="flex" gap={1} flexWrap="wrap">

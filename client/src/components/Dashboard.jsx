@@ -29,7 +29,7 @@ export default function Dashboard() {
             startIcon={<LogoutIcon />}
             onClick={handleLogout}
           >
-            Logout
+            Logga ut
           </Button>
         </Toolbar>
       </AppBar>
@@ -37,7 +37,7 @@ export default function Dashboard() {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box mb={4}>
           <Typography variant="h3" component="h1" gutterBottom>
-            Welcome, {user?.username}!
+            Välkommen, {user?.username}!
           </Typography>
         </Box>
         

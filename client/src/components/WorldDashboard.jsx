@@ -113,18 +113,18 @@ export default function WorldDashboard() {
           onClick={() => navigate('/')}
           variant="outlined"
         >
-          Back to Worlds
+          Tillbaka till världar
         </Button>
-        <Typography variant="h4">{world?.name || 'Loading...'}</Typography>
+        <Typography variant="h4">{world?.name || 'Laddar...'}</Typography>
       </Box>
 
       <Paper sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={activeTab} onChange={handleTabChange} aria-label="world dashboard tabs">
-            <Tab icon={<PersonIcon />} label="Players" />
-            <Tab icon={<MapIcon />} label="Maps" />
-            <Tab icon={<ArticleIcon />} label="Articles" />
-            <Tab icon={<RuleIcon />} label="Rules" />
+            <Tab icon={<PersonIcon />} label="Spelare" />
+            <Tab icon={<MapIcon />} label="Kartor" />
+            <Tab icon={<ArticleIcon />} label="Artiklar" />
+            <Tab icon={<RuleIcon />} label="Regler" />
           </Tabs>
         </Box>
         <TabPanel value={activeTab} index={0}>
@@ -178,11 +178,11 @@ function PlayersTab({ worldId, world }) {
         const data = await response.json();
         setCharacters(data.characters || []);
       } else {
-        setError('Failed to load characters');
+        setError('Misslyckades att ladda karaktärer');
       }
     } catch (err) {
       console.error('Error fetching characters:', err);
-      setError('Failed to load characters');
+      setError('Misslyckades att ladda karaktärer');
     } finally {
       setLoading(false);
     }
@@ -216,14 +216,14 @@ function PlayersTab({ worldId, world }) {
         setShowInviteDialog(false);
         setInviteUsername('');
         setInviteMessage('');
-        alert('Invite sent successfully!');
+        alert('Injudan skickades!');
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Failed to send invite');
+        alert(errorData.message || 'Misslyckades att skicka inbjudan');
       }
     } catch (err) {
       console.error('Error sending invite:', err);
-      alert('Failed to send invite');
+      alert('Misslyckades att skicka inbjudan');
     } finally {
       setSending(false);
     }
@@ -253,14 +253,14 @@ function PlayersTab({ worldId, world }) {
         setCharacterName('');
         setCharacterBio('');
         fetchCharacters(); // Refresh the list
-        alert('Character created successfully!');
+        alert('Karaktär skapad!');
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Failed to create character');
+        alert(errorData.message || 'Misslyckades att skapa karaktär');
       }
     } catch (err) {
       console.error('Error creating character:', err);
-      alert('Failed to create character');
+      alert('Misslyckades att skapa karaktär');
     } finally {
       setCreating(false);
     }
@@ -281,14 +281,14 @@ function PlayersTab({ worldId, world }) {
       if (response.ok) {
         setCharacterToDelete(null);
         fetchCharacters(); // Refresh the list
-        alert('Character deleted successfully!');
+        alert('Karaktär raderad!');
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Failed to delete character');
+        alert(errorData.message || 'Misslyckades att radera karaktär');
       }
     } catch (err) {
       console.error('Error deleting character:', err);
-      alert('Failed to delete character');
+      alert('Misslyckades att radera karaktär');
     } finally {
       setDeleting(false);
     }
@@ -305,21 +305,21 @@ function PlayersTab({ worldId, world }) {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5">Characters</Typography>
+        <Typography variant="h5">Karaktärer</Typography>
         <Stack direction="row" spacing={2}>
           <Button
             variant="contained"
             startIcon={<PersonAddIcon />}
             onClick={() => setShowCreateCharacterDialog(true)}
           >
-            Create Character
+            Skapa karaktär
           </Button>
           <Button
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={() => setShowInviteDialog(true)}
           >
-            Send Invite
+            Skicka inbjudan
           </Button>
         </Stack>
       </Box>
@@ -332,13 +332,13 @@ function PlayersTab({ worldId, world }) {
       {/* Create Character Dialog */}
       <Dialog open={showCreateCharacterDialog} onClose={() => setShowCreateCharacterDialog(false)} maxWidth="sm" fullWidth>
         <form onSubmit={handleCreateCharacter}>
-          <DialogTitle>Create Character</DialogTitle>
+          <DialogTitle>Skapa karaktär</DialogTitle>
           <DialogContent>
             <TextField
               autoFocus
               margin="dense"
               id="characterName"
-              label="Character Name"
+              label="Karaktärnamn"
               type="text"
               fullWidth
               variant="outlined"
@@ -351,7 +351,7 @@ function PlayersTab({ worldId, world }) {
             <TextField
               margin="dense"
               id="characterBio"
-              label="Bio (optional)"
+              label="Biografi (valfritt)"
               type="text"
               fullWidth
               variant="outlined"
@@ -364,10 +364,10 @@ function PlayersTab({ worldId, world }) {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreateCharacterDialog(false)} disabled={creating}>
-              Cancel
+              Avbryt
             </Button>
             <Button type="submit" variant="contained" disabled={creating || !characterName.trim()}>
-              {creating ? 'Creating...' : 'Create'}
+              {creating ? 'Skapar...' : 'Skapa'}
             </Button>
           </DialogActions>
         </form>
@@ -376,13 +376,13 @@ function PlayersTab({ worldId, world }) {
       {/* Send Invite Dialog */}
       <Dialog open={showInviteDialog} onClose={() => setShowInviteDialog(false)} maxWidth="sm" fullWidth>
         <form onSubmit={handleSendInvite}>
-          <DialogTitle>Send Invite</DialogTitle>
+          <DialogTitle>Skicka inbjudan</DialogTitle>
           <DialogContent>
             <TextField
               autoFocus
               margin="dense"
               id="inviteUsername"
-              label="Username"
+              label="Användarnamn"
               type="text"
               fullWidth
               variant="outlined"
@@ -395,7 +395,7 @@ function PlayersTab({ worldId, world }) {
             <TextField
               margin="dense"
               id="inviteMessage"
-              label="Message (optional)"
+              label="Meddelande (valfritt)"
               type="text"
               fullWidth
               variant="outlined"
@@ -408,10 +408,10 @@ function PlayersTab({ worldId, world }) {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowInviteDialog(false)} disabled={sending}>
-              Cancel
+              Avbryt
             </Button>
             <Button type="submit" variant="contained" disabled={sending || !inviteUsername.trim()}>
-              {sending ? 'Sending...' : 'Send'}
+              {sending ? 'Skickar...' : 'Skicka'}
             </Button>
           </DialogActions>
         </form>
@@ -419,15 +419,15 @@ function PlayersTab({ worldId, world }) {
 
       {/* Delete Character Confirmation Dialog */}
       <Dialog open={!!characterToDelete} onClose={() => setCharacterToDelete(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Delete Character</DialogTitle>
+        <DialogTitle>Radera karaktär</DialogTitle>
         <DialogContent>
           <Typography variant="body1">
-            Are you sure you want to delete <strong>{characterToDelete?.name}</strong>? This action cannot be undone.
+            Är du säker på att du vill radera <strong>{characterToDelete?.name}</strong>? Denna åtgärd kan inte ångras.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCharacterToDelete(null)} disabled={deleting}>
-            Cancel
+            Avbryt
           </Button>
           <Button 
             variant="contained" 
@@ -436,7 +436,7 @@ function PlayersTab({ worldId, world }) {
             disabled={deleting}
             startIcon={<DeleteIcon />}
           >
-            {deleting ? 'Deleting...' : 'Delete'}
+            {deleting ? 'Radera...' : 'Radera'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -445,7 +445,7 @@ function PlayersTab({ worldId, world }) {
       {characters.length === 0 ? (
         <Box textAlign="center" py={8}>
           <Typography variant="body1" color="text.secondary">
-            No characters have been created in this world yet.
+            Inga karaktärer har skapats i denna värld än.
           </Typography>
         </Box>
       ) : (
@@ -462,18 +462,18 @@ function PlayersTab({ worldId, world }) {
                   </Typography>
                   <Box mb={1}>
                     <Typography variant="caption" color="text.secondary">
-                      Owned by: {character.owner?.username || 'Unknown'}
+                      Ägare: {character.owner?.username || 'Okänd'}
                     </Typography>
                   </Box>
                   <Box display="flex" gap={1} flexWrap="wrap">
                     <Chip
-                      label={character.isActive ? 'Active' : 'Inactive'}
+                      label={character.isActive ? 'Aktiv' : 'Inaktiv'}
                       color={character.isActive ? 'success' : 'default'}
                       size="small"
                     />
                     {character.owner?.id === user?.id && (
                       <Chip
-                        label="My Character"
+                        label="Min karaktär"
                         color="primary"
                         size="small"
                       />
@@ -488,7 +488,7 @@ function PlayersTab({ worldId, world }) {
                       startIcon={<DeleteIcon />}
                       onClick={() => setCharacterToDelete(character)}
                     >
-                      Delete
+                      Radera
                     </Button>
                   </CardActions>
                 )}
@@ -505,7 +505,7 @@ function PlayersTab({ worldId, world }) {
 function MapsTab() {
   return (
     <Typography variant="body1" color="text.secondary">
-      Maps feature coming soon...
+      Kartor kommer snart...
     </Typography>
   );
 }
@@ -513,7 +513,7 @@ function MapsTab() {
 function ArticlesTab() {
   return (
     <Typography variant="body1" color="text.secondary">
-      Articles feature coming soon...
+      Artiklar kommer snart...
     </Typography>
   );
 }
@@ -521,7 +521,7 @@ function ArticlesTab() {
 function RulesTab() {
   return (
     <Typography variant="body1" color="text.secondary">
-      Rules feature coming soon...
+      Regler kommer snart...
     </Typography>
   );
 }

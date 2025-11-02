@@ -52,11 +52,11 @@ export default function WorldsList() {
         const data = await response.json();
         setWorlds(data.worlds);
       } else {
-        setError('Failed to load worlds');
+        setError('Misslyckades att ladda världar');
       }
     } catch (err) {
       console.error('Error fetching worlds:', err);
-      setError('Failed to load worlds');
+      setError('Misslyckades att ladda världar');
     } finally {
       setLoading(false);
     }
@@ -108,11 +108,11 @@ export default function WorldsList() {
         fetchWorlds();
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Failed to create world');
+        alert(errorData.message || 'Misslyckades att skapa värld');
       }
     } catch (err) {
       console.error('Error creating world:', err);
-      alert('Failed to create world');
+      alert('Misslyckades att skapa värld');
     } finally {
       setCreating(false);
     }
@@ -139,11 +139,11 @@ export default function WorldsList() {
         }
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Failed to accept invite');
+        alert(errorData.message || 'Misslyckades att acceptera inbjudan');
       }
     } catch (err) {
       console.error('Error accepting invite:', err);
-      alert('Failed to accept invite');
+      alert('Misslyckades att acceptera inbjudan');
     }
   };
 
@@ -160,11 +160,11 @@ export default function WorldsList() {
         fetchInvites();
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Failed to decline invite');
+        alert(errorData.message || 'Misslyckades att avbryta inbjudan');
       }
     } catch (err) {
       console.error('Error declining invite:', err);
-      alert('Failed to decline invite');
+      alert('Misslyckades att avbryta inbjudan');
     }
   };
 
@@ -183,14 +183,14 @@ export default function WorldsList() {
       if (response.ok) {
         setWorldToDelete(null);
         fetchWorlds(); // Refresh the list
-        alert('World deleted successfully!');
+        alert('Värld raderad!');
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Failed to delete world');
+        alert(errorData.message || 'Misslyckades att radera värld');
       }
     } catch (err) {
       console.error('Error deleting world:', err);
-      alert('Failed to delete world');
+      alert('Misslyckades att radera värld');
     } finally {
       setDeletingWorld(false);
     }
@@ -216,27 +216,27 @@ export default function WorldsList() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h2">
-          My Worlds
+          Mina världar
         </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setShowCreateDialog(true)}
-        >
-          Create World
+        > 
+          Skapa värld
         </Button>
       </Box>
 
       {/* Create World Dialog */}
       <Dialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)} maxWidth="sm" fullWidth>
         <form onSubmit={handleCreateWorld}>
-          <DialogTitle>Create New World</DialogTitle>
+          <DialogTitle>Skapa ny värld</DialogTitle>
           <DialogContent>
             <TextField
               autoFocus
               margin="dense"
               id="worldName"
-              label="World Name"
+              label="Världsnamn"
               type="text"
               fullWidth
               variant="outlined"
@@ -248,10 +248,10 @@ export default function WorldsList() {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreateDialog(false)} disabled={creating}>
-              Cancel
+              Avbryt
             </Button>
             <Button type="submit" variant="contained" disabled={creating || !worldName.trim()}>
-              {creating ? 'Creating...' : 'Create'}
+              {creating ? 'Skapar...' : 'Skapa'}
             </Button>
           </DialogActions>
         </form>
@@ -259,15 +259,15 @@ export default function WorldsList() {
 
       {/* Delete World Confirmation Dialog */}
       <Dialog open={!!worldToDelete} onClose={() => setWorldToDelete(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Delete World</DialogTitle>
+        <DialogTitle>Radera värld</DialogTitle>
         <DialogContent>
           <Typography variant="body1">
-            Are you sure you want to delete <strong>{worldToDelete?.name}</strong>? This will permanently delete the world and all characters in it. This action cannot be undone.
+            Är du säker på att du vill radera <strong>{worldToDelete?.name}</strong>? Denna åtgärd kan inte ångras.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setWorldToDelete(null)} disabled={deletingWorld}>
-            Cancel
+            Avbryt
           </Button>
           <Button 
             variant="contained" 
@@ -276,7 +276,7 @@ export default function WorldsList() {
             disabled={deletingWorld}
             startIcon={<DeleteIcon />}
           >
-            {deletingWorld ? 'Deleting...' : 'Delete'}
+            {deletingWorld ? 'Radera...' : 'Radera'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -285,17 +285,17 @@ export default function WorldsList() {
       {invites.length > 0 && (
         <Box mb={4}>
           <Typography variant="h5" gutterBottom>
-            Invitations
+            Inbjudan
           </Typography>
           <Stack spacing={2}>
-            {invites.map(invite => (
-              <Card key={invite.id || invite._id} variant="outlined" sx={{ bgcolor: 'warning.light' }}>
+            {invites.map((invite, index) => (
+              <Card key={invite.id || invite._id || `invite-${index}`} variant="outlined" sx={{ bgcolor: 'warning.light' }}>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Box>
                       <Typography variant="h6">{invite.world.name}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Invited by {invite.inviter.username}
+                        Inbjuden av {invite.inviter.username}
                       </Typography>
                       {invite.message && (
                         <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 1 }}>
@@ -309,13 +309,13 @@ export default function WorldsList() {
                         color="success"
                         onClick={() => handleAcceptInvite(invite.id || invite._id)}
                       >
-                        Accept
+                        Acceptera inbjudan
                       </Button>
                       <Button
                         variant="outlined"
                         onClick={() => handleDeclineInvite(invite.id || invite._id)}
                       >
-                        Decline
+                        Avbryta inbjudan
                       </Button>
                     </Stack>
                   </Stack>
@@ -330,17 +330,17 @@ export default function WorldsList() {
       {worlds.length === 0 && invites.length === 0 ? (
         <Box textAlign="center" py={8}>
           <Typography variant="body1" color="text.secondary">
-            You haven&apos;t created or joined any worlds yet.
+            Du har inte skapat eller accepterat några världar än.
           </Typography>
         </Box>
       ) : worlds.length > 0 ? (
         <Box>
           <Typography variant="h5" gutterBottom>
-            Your Worlds
+            Dina världar
           </Typography>
           <Grid container spacing={3}>
-            {worlds.map(world => (
-              <Grid item xs={12} sm={6} md={4} key={world._id}>
+            {worlds.map((world, index) => (
+              <Grid item xs={12} sm={6} md={4} key={world.id || world._id || `world-${index}`}>
                 <Card
                   sx={{
                     height: '100%',
@@ -355,23 +355,23 @@ export default function WorldsList() {
                 >
                   <CardContent
                     component={Link}
-                    to={`/world/${world._id}`}
+                    to={`/world/${world.id || world._id}`}
                     sx={{ textDecoration: 'none', flexGrow: 1 }}
                   >
                     <Typography variant="h6" component="h3" gutterBottom>
                       {world.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" paragraph>
-                      {world.description || 'No description'}
+                      {world.description || 'Ingen beskrivning'}
                     </Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap">
                       <Chip
-                        label={world.admin === user?.id ? 'Admin' : 'Member'}
+                        label={world.admin === user?.id ? 'Admin' : 'Medlem'}
                         color={world.admin === user?.id ? 'primary' : 'default'}
                         size="small"
                       />
                       <Chip
-                        label={world.isPublic ? 'Public' : 'Private'}
+                        label={world.isPublic ? 'Offentlig' : 'Privat'}
                         color={world.isPublic ? 'success' : 'default'}
                         size="small"
                       />
@@ -388,7 +388,7 @@ export default function WorldsList() {
                           setWorldToDelete(world);
                         }}
                       >
-                        Delete
+                        Radera
                       </Button>
                     </CardActions>
                   )}

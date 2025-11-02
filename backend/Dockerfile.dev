@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for development tools)
+RUN npm install
+
+# Install nodemon globally for better file watching
+RUN npm install -g nodemon
+
+# Expose port
+EXPOSE 3000
+
+# Start the application with watch mode for hot-reload
+CMD ["nodemon", "server.js"]
+
