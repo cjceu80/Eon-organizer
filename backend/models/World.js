@@ -36,5 +36,17 @@ const worldSchema = new mongoose.Schema({
 worldSchema.index({ admin: 1 });
 worldSchema.index({ isPublic: 1 });
 
+// Convert _id to id for consistency and handle admin field
+worldSchema.methods.toJSON = function() {
+  const obj = this.toObject();
+  obj.id = obj._id.toString();
+  delete obj._id;
+  // Convert admin ObjectId to string if it exists
+  if (obj.admin && obj.admin.toString) {
+    obj.admin = obj.admin.toString();
+  }
+  return obj;
+};
+
 export default mongoose.model('World', worldSchema);
 

@@ -1,6 +1,7 @@
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import WorldsList from './WorldsList';
+import CharactersList from './CharactersList';
 import { Box, Container, Typography, Button, AppBar, Toolbar } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 
@@ -40,7 +41,10 @@ export default function Dashboard() {
           </Typography>
         </Box>
         
-        <WorldsList />
+        <CharactersList />
+        <Box mt={6}>
+          <WorldsList />
+        </Box>
       </Container>
     </Box>
   );

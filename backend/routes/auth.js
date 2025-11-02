@@ -43,7 +43,7 @@ router.post('/register', asyncHandler(async (req, res) => {
       message: 'User registered successfully',
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         username: user.username,
         email: user.email
       }
@@ -93,7 +93,7 @@ router.post('/login', asyncHandler(async (req, res) => {
       message: 'Login successful',
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         username: user.username,
         email: user.email
       }

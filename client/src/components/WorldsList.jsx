@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
   Box,
-  Container,
   Typography,
   Button,
   Grid,
   Card,
   CardContent,
+  CardActions,
   Chip,
   CircularProgress,
   Alert,
@@ -20,9 +20,11 @@ import {
   Stack
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 export default function WorldsList() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [worlds, setWorlds] = useState([]);
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +32,8 @@ export default function WorldsList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [worldName, setWorldName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [worldToDelete, setWorldToDelete] = useState(null);
+  const [deletingWorld, setDeletingWorld] = useState(false);
 
   const fetchWorlds = async () => {
     if (!token) {
@@ -124,9 +128,15 @@ export default function WorldsList() {
       });
 
       if (response.ok) {
-        fetchInvites();
-        fetchWorlds();
-        alert('Invite accepted! You can now create characters in this world.');
+        const data = await response.json();
+        // Navigate to the world dashboard immediately using the returned world ID
+        if (data.worldId) {
+          navigate(`/world/${data.worldId}`);
+        } else if (data.world && (data.world.id || data.world._id)) {
+          navigate(`/world/${data.world.id || data.world._id}`);
+        } else {
+          alert('Invite accepted! Refresh the page to see the world.');
+        }
       } else {
         const errorData = await response.json();
         alert(errorData.message || 'Failed to accept invite');
@@ -158,6 +168,34 @@ export default function WorldsList() {
     }
   };
 
+  const handleDeleteWorld = async () => {
+    if (!worldToDelete) return;
+
+    setDeletingWorld(true);
+    try {
+      const response = await fetch(`/api/worlds/${worldToDelete.id || worldToDelete._id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setWorldToDelete(null);
+        fetchWorlds(); // Refresh the list
+        alert('World deleted successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to delete world');
+      }
+    } catch (err) {
+      console.error('Error deleting world:', err);
+      alert('Failed to delete world');
+    } finally {
+      setDeletingWorld(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -168,14 +206,14 @@ export default function WorldsList() {
 
   if (error) {
     return (
-      <Container>
+      <Box>
         <Alert severity="error">{error}</Alert>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h2">
           My Worlds
@@ -219,6 +257,30 @@ export default function WorldsList() {
         </form>
       </Dialog>
 
+      {/* Delete World Confirmation Dialog */}
+      <Dialog open={!!worldToDelete} onClose={() => setWorldToDelete(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete World</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Are you sure you want to delete <strong>{worldToDelete?.name}</strong>? This will permanently delete the world and all characters in it. This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setWorldToDelete(null)} disabled={deletingWorld}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={handleDeleteWorld} 
+            disabled={deletingWorld}
+            startIcon={<DeleteIcon />}
+          >
+            {deletingWorld ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Invites Section */}
       {invites.length > 0 && (
         <Box mb={4}>
@@ -227,7 +289,7 @@ export default function WorldsList() {
           </Typography>
           <Stack spacing={2}>
             {invites.map(invite => (
-              <Card key={invite._id} variant="outlined" sx={{ bgcolor: 'warning.light' }}>
+              <Card key={invite.id || invite._id} variant="outlined" sx={{ bgcolor: 'warning.light' }}>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Box>
@@ -245,13 +307,13 @@ export default function WorldsList() {
                       <Button
                         variant="contained"
                         color="success"
-                        onClick={() => handleAcceptInvite(invite._id)}
+                        onClick={() => handleAcceptInvite(invite.id || invite._id)}
                       >
                         Accept
                       </Button>
                       <Button
                         variant="outlined"
-                        onClick={() => handleDeclineInvite(invite._id)}
+                        onClick={() => handleDeclineInvite(invite.id || invite._id)}
                       >
                         Decline
                       </Button>
@@ -280,12 +342,10 @@ export default function WorldsList() {
             {worlds.map(world => (
               <Grid item xs={12} sm={6} md={4} key={world._id}>
                 <Card
-                  component={Link}
-                  to={`/world/${world._id}`}
                   sx={{
-                    textDecoration: 'none',
-                    display: 'block',
                     height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     '&:hover': {
                       transform: 'translateY(-4px)',
@@ -293,7 +353,11 @@ export default function WorldsList() {
                     }
                   }}
                 >
-                  <CardContent>
+                  <CardContent
+                    component={Link}
+                    to={`/world/${world._id}`}
+                    sx={{ textDecoration: 'none', flexGrow: 1 }}
+                  >
                     <Typography variant="h6" component="h3" gutterBottom>
                       {world.name}
                     </Typography>
@@ -313,12 +377,27 @@ export default function WorldsList() {
                       />
                     </Stack>
                   </CardContent>
+                  {world.admin === user?.id && (
+                    <CardActions>
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setWorldToDelete(world);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </CardActions>
+                  )}
                 </Card>
               </Grid>
             ))}
           </Grid>
         </Box>
       ) : null}
-    </Container>
+    </Box>
   );
 }

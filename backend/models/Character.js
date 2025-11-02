@@ -46,5 +46,43 @@ const characterSchema = new mongoose.Schema({
 characterSchema.index({ world: 1, owner: 1 });
 characterSchema.index({ world: 1 });
 
+// Convert _id to id for consistency and handle reference fields
+characterSchema.methods.toJSON = function() {
+  const obj = this.toObject();
+  obj.id = obj._id.toString();
+  delete obj._id;
+  
+  // Convert ObjectId references to strings (only if raw ObjectId, not populated objects)
+  if (obj.owner && typeof obj.owner === 'object') {
+    // Check if it's an ObjectId by looking for toString method without object properties
+    if (!obj.owner.username && typeof obj.owner.toString === 'function') {
+      obj.owner = obj.owner.toString();
+    }
+    // Handle populated owner - convert _id to id
+    else if (obj.owner._id) {
+      obj.owner.id = obj.owner._id.toString();
+      delete obj.owner._id;
+    }
+  }
+  if (obj.world && typeof obj.world === 'object') {
+    // Check if it's an ObjectId by looking for toString method without object properties
+    if (!obj.world.name && typeof obj.world.toString === 'function') {
+      obj.world = obj.world.toString();
+    }
+    // Handle populated world - convert _id to id and handle nested admin field
+    else {
+      if (obj.world._id) {
+        obj.world.id = obj.world._id.toString();
+        delete obj.world._id;
+      }
+      // Convert admin ObjectId to string if it exists
+      if (obj.world.admin && obj.world.admin.toString) {
+        obj.world.admin = obj.world.admin.toString();
+      }
+    }
+  }
+  return obj;
+};
+
 export default mongoose.model('Character', characterSchema);
 

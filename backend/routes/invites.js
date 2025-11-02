@@ -125,8 +125,12 @@ router.post('/:inviteId/accept', authenticateToken, asyncHandler(async (req, res
   invite.status = 'accepted';
   await invite.save();
 
+  // Return the worldId for navigation (use id if available, otherwise _id)
+  const worldId = invite.world.id || invite.world._id?.toString();
+  
   res.json({ 
     message: 'Invite accepted. You can now create characters in this world.',
+    worldId: worldId,
     world: invite.world
   });
 }));

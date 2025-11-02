@@ -108,7 +108,7 @@ router.get('/:characterId', authenticateToken, asyncHandler(async (req, res) => 
 
   // Check access permissions
   const canView = 
-    character.owner._id.toString() === req.user.id || 
+    (character.owner._id ? character.owner._id.toString() : character.owner.id) === req.user.id || 
     character.world.admin.toString() === req.user.id;
 
   if (!canView) {
