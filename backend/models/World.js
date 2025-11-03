@@ -23,6 +23,12 @@ const worldSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  ruleset: {
+    type: String,
+    enum: ['EON'],
+    default: 'EON',
+    required: true
+  },
   settings: {
     type: Map,
     of: mongoose.Schema.Types.Mixed,

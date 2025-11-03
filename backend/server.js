@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import worldRoutes from './routes/worlds.js';
 import characterRoutes from './routes/characters.js';
 import inviteRoutes from './routes/invites.js';
+import raceRoutes from './routes/races.js';
+import raceCategoryRoutes from './routes/raceCategories.js';
 import { authenticateToken } from './middleware/auth.js';
 
 dotenv.config();
@@ -50,6 +52,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/worlds', worldRoutes);
 app.use('/api/characters', characterRoutes);
 app.use('/api/invites', inviteRoutes);
+app.use('/api/races', raceRoutes);
+app.use('/api/race-categories', raceCategoryRoutes);
 
 // Basic health check route
 app.get('/api/health', (req, res) => {

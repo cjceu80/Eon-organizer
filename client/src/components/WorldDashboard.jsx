@@ -116,6 +116,14 @@ export default function WorldDashboard() {
           Tillbaka till världar
         </Button>
         <Typography variant="h4">{world?.name || 'Laddar...'}</Typography>
+        {world?.ruleset && (
+          <Chip
+            label={world.ruleset}
+            color="info"
+            size="medium"
+            sx={{ ml: 2 }}
+          />
+        )}
       </Box>
 
       <Paper sx={{ width: '100%' }}>

@@ -13,7 +13,7 @@ const asyncHandler = (fn) => (req, res, next) => {
 
 // Create a new world
 router.post('/', authenticateToken, asyncHandler(async (req, res) => {
-  const { name, description, isPublic, settings } = req.body;
+  const { name, description, isPublic, ruleset, settings } = req.body;
 
   // Validation
   if (!name || !name.trim()) {
@@ -36,6 +36,7 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
     description: description || '',
     admin: req.user.id,
     isPublic: isPublic || false,
+    ruleset: ruleset || 'EON',
     settings: settings || {}
   });
 

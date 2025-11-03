@@ -17,7 +17,8 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Stack
+  Stack,
+  MenuItem
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -31,6 +32,7 @@ export default function WorldsList() {
   const [error, setError] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [worldName, setWorldName] = useState('');
+  const [selectedRuleset, setSelectedRuleset] = useState('EON');
   const [creating, setCreating] = useState(false);
   const [worldToDelete, setWorldToDelete] = useState(null);
   const [deletingWorld, setDeletingWorld] = useState(false);
@@ -99,12 +101,13 @@ export default function WorldsList() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ name: worldName })
+        body: JSON.stringify({ name: worldName, ruleset: selectedRuleset })
       });
 
       if (response.ok) {
         setShowCreateDialog(false);
         setWorldName('');
+        setSelectedRuleset('EON');
         fetchWorlds();
       } else {
         const errorData = await response.json();
@@ -244,7 +247,21 @@ export default function WorldsList() {
               onChange={(e) => setWorldName(e.target.value)}
               disabled={creating}
               required
+              sx={{ mb: 2 }}
             />
+            <TextField
+              margin="dense"
+              id="ruleset"
+              label="Regelsystem"
+              select
+              fullWidth
+              variant="outlined"
+              value={selectedRuleset}
+              onChange={(e) => setSelectedRuleset(e.target.value)}
+              disabled={creating}
+            >
+              <MenuItem value="EON">EON</MenuItem>
+            </TextField>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreateDialog(false)} disabled={creating}>
@@ -373,6 +390,11 @@ export default function WorldsList() {
                       <Chip
                         label={world.isPublic ? 'Offentlig' : 'Privat'}
                         color={world.isPublic ? 'success' : 'default'}
+                        size="small"
+                      />
+                      <Chip
+                        label={world.ruleset || 'EON'}
+                        color="info"
                         size="small"
                       />
                     </Stack>
