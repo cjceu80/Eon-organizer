@@ -37,6 +37,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RaceSelectionDialog from './RaceSelectionDialog';
 import StatRollingDialog from './StatRollingDialog';
+import CharacteristicsDialog from './CharacteristicsDialog';
 import AgeCalculationDialog from './AgeCalculationDialog';
 
 function TabPanel({ children, value, index, ...other }) {
@@ -170,6 +171,7 @@ function PlayersTab({ worldId, world }) {
   const [sending, setSending] = useState(false);
   const [showRaceSelectionDialog, setShowRaceSelectionDialog] = useState(false);
   const [showStatRollingDialog, setShowStatRollingDialog] = useState(false);
+  const [showCharacteristicsDialog, setShowCharacteristicsDialog] = useState(false);
   const [showAgeCalculationDialog, setShowAgeCalculationDialog] = useState(false);
   const [showCreateCharacterDialog, setShowCreateCharacterDialog] = useState(false);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -177,6 +179,7 @@ function PlayersTab({ worldId, world }) {
   const [characterBio, setCharacterBio] = useState('');
   const [selectedRace, setSelectedRace] = useState(null);
   const [rolledStats, setRolledStats] = useState(null);
+  const [characteristicsData, setCharacteristicsData] = useState(null);
   const [ageData, setAgeData] = useState(null);
   const [creating, setCreating] = useState(false);
   const [characterToDelete, setCharacterToDelete] = useState(null);
@@ -199,7 +202,7 @@ function PlayersTab({ worldId, world }) {
   }, [getStorageKey]);
 
   // Save character creation data to localStorage
-  const saveCharacterCreationData = useCallback((race, name, bio, stats = null) => {
+  const saveCharacterCreationData = useCallback((race, name, bio, stats = null, characteristics = null) => {
     try {
       const data = {
         worldId,
@@ -207,6 +210,7 @@ function PlayersTab({ worldId, world }) {
         name: name || '',
         bio: bio || '',
         stats: stats || null,
+        characteristics: characteristics || null,
         timestamp: Date.now()
       };
       localStorage.setItem(getStorageKey(), JSON.stringify(data));
@@ -330,11 +334,23 @@ function PlayersTab({ worldId, world }) {
   const handleAgeCalculated = (ageDataResult) => {
     setAgeData(ageDataResult);
     setShowAgeCalculationDialog(false);
-    setShowCreateCharacterDialog(true);
+    setShowCharacteristicsDialog(true);
     // Save age data to localStorage
     const savedData = loadCharacterCreationData();
     if (savedData) {
       savedData.ageData = ageDataResult;
+      localStorage.setItem(getStorageKey(), JSON.stringify(savedData));
+    }
+  };
+
+  const handleCharacteristicsConfirmed = (characteristicsResult) => {
+    setCharacteristicsData(characteristicsResult);
+    setShowCharacteristicsDialog(false);
+    setShowCreateCharacterDialog(true);
+    // Save characteristics to localStorage
+    const savedData = loadCharacterCreationData();
+    if (savedData) {
+      savedData.characteristics = characteristicsResult;
       localStorage.setItem(getStorageKey(), JSON.stringify(savedData));
     }
   };
@@ -360,10 +376,16 @@ function PlayersTab({ worldId, world }) {
             // If we have stats, continue to next step
             if (savedData.stats) {
               setRolledStats(savedData.stats);
-              // If we have age data, go to final dialog, otherwise go to age calculation
+              // If we have age data, continue to next step
               if (savedData.ageData) {
                 setAgeData(savedData.ageData);
-                setShowCreateCharacterDialog(true);
+                // If we have characteristics, go to final dialog, otherwise go to characteristics
+                if (savedData.characteristics) {
+                  setCharacteristicsData(savedData.characteristics);
+                  setShowCreateCharacterDialog(true);
+                } else {
+                  setShowCharacteristicsDialog(true);
+                }
               } else {
                 setShowAgeCalculationDialog(true);
               }
@@ -392,6 +414,9 @@ function PlayersTab({ worldId, world }) {
     setSelectedRace(null);
     setCharacterName('');
     setCharacterBio('');
+    setRolledStats(null);
+    setCharacteristicsData(null);
+    setAgeData(null);
     setShowResumeDialog(false);
     setShowRaceSelectionDialog(true);
   };
@@ -402,7 +427,7 @@ function PlayersTab({ worldId, world }) {
 
   const handleCreateCharacter = async (e) => {
     e.preventDefault();
-    if (!characterName.trim() || !selectedRace || !rolledStats || !ageData) return;
+    if (!characterName.trim() || !selectedRace || !rolledStats || !characteristicsData || !ageData) return;
 
     setCreating(true);
     try {
@@ -416,20 +441,22 @@ function PlayersTab({ worldId, world }) {
           name: characterName,
           worldId,
           bio: characterBio,
-                     stats: {
-             race: selectedRace.id || selectedRace._id,
-             attributes: rolledStats.attributes,
-             rollMethod: rolledStats.method,
-             rerollsUsed: rolledStats.rerollsUsed || 0,
-             age: ageData?.age,
-             ageBonus: ageData?.ageBonus,
-             ageRollDetails: ageData?.ageRollDetails,
-             kroppsbyggnad: ageData?.kroppsbyggnad,
-             kroppsbyggnadRollDetails: ageData?.kroppsbyggnadRollDetails,
-             length: ageData?.length,
-             weight: ageData?.weight,
-             lengthRollDetails: ageData?.lengthRollDetails
-           }
+          stats: {
+            race: selectedRace.id || selectedRace._id,
+            attributes: rolledStats.attributes,
+            rollMethod: rolledStats.method,
+            rerollsUsed: rolledStats.rerollsUsed || 0,
+            age: ageData?.age,
+            ageBonus: ageData?.ageBonus,
+            ageRollDetails: ageData?.ageRollDetails,
+            kroppsbyggnad: ageData?.kroppsbyggnad,
+            kroppsbyggnadRollDetails: ageData?.kroppsbyggnadRollDetails,
+            length: ageData?.length,
+            weight: ageData?.weight,
+            lengthRollDetails: ageData?.lengthRollDetails,
+            characteristics: characteristicsData?.characteristics || {},
+            specializations: characteristicsData?.specializations || {}
+          }
         })
       });
 
@@ -439,6 +466,7 @@ function PlayersTab({ worldId, world }) {
         setCharacterBio('');
         setSelectedRace(null);
         setRolledStats(null);
+        setCharacteristicsData(null);
         setAgeData(null);
         clearCharacterCreationData(); // Clear localStorage on successful creation
         fetchCharacters(); // Refresh the list
@@ -605,19 +633,28 @@ function PlayersTab({ worldId, world }) {
         maxAttributes={world?.settings?.maxAttributes !== undefined ? world?.settings?.maxAttributes : null}
       />
 
-             <AgeCalculationDialog
-         open={showAgeCalculationDialog}
-         onClose={() => {
-           setShowAgeCalculationDialog(false);
-           // Go back to stat rolling if user cancels
-         }}
-         onConfirm={handleAgeCalculated}
-         attributes={rolledStats?.attributes}
-         rerolls={world?.settings?.rerolls || 0}
-         selectedRace={selectedRace}
-         gender={rolledStats?.gender || 'man'}
-         varierandeVikt={world?.settings?.varierandeVikt !== undefined ? world?.settings?.varierandeVikt : true}
-       />
+      <AgeCalculationDialog
+        open={showAgeCalculationDialog}
+        onClose={() => {
+          setShowAgeCalculationDialog(false);
+          // Go back to stat rolling if user cancels
+        }}
+        onConfirm={handleAgeCalculated}
+        attributes={rolledStats?.attributes}
+        rerolls={world?.settings?.rerolls || 0}
+        selectedRace={selectedRace}
+        gender={rolledStats?.gender || 'man'}
+        varierandeVikt={world?.settings?.varierandeVikt !== undefined ? world?.settings?.varierandeVikt : true}
+      />
+
+      <CharacteristicsDialog
+        open={showCharacteristicsDialog}
+        onClose={() => {
+          setShowCharacteristicsDialog(false);
+          // Go back to age calculation if user cancels
+        }}
+        onConfirm={handleCharacteristicsConfirmed}
+      />
 
       {/* Create Character Dialog */}
       <Dialog open={showCreateCharacterDialog} onClose={() => {
