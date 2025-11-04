@@ -8,6 +8,7 @@ import characterRoutes from './routes/characters.js';
 import inviteRoutes from './routes/invites.js';
 import raceRoutes from './routes/races.js';
 import raceCategoryRoutes from './routes/raceCategories.js';
+import npcRoutes from './routes/npcs.js';
 import { authenticateToken } from './middleware/auth.js';
 
 dotenv.config();
@@ -54,6 +55,7 @@ app.use('/api/characters', characterRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/races', raceRoutes);
 app.use('/api/race-categories', raceCategoryRoutes);
+app.use('/api/npcs', npcRoutes);
 
 // Basic health check route
 app.get('/api/health', (req, res) => {

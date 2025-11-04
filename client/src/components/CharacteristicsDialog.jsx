@@ -78,11 +78,13 @@ export default function CharacteristicsDialog({
 
     if (open) {
       loadData();
-      // Initialize characteristics with fixed values
+      // Initialize characteristics with fixed values and default non-fixed to 11
       const initial = {};
       CHARACTERISTICS.forEach(char => {
         if (char.fixed) {
           initial[char.key] = char.value;
+        } else {
+          initial[char.key] = 11;
         }
       });
       setCharacteristics(initial);
@@ -129,7 +131,9 @@ export default function CharacteristicsDialog({
     if (char?.fixed) {
       return char.value;
     }
-    return characteristics[characteristicKey] || '';
+    return characteristics[characteristicKey] !== undefined && characteristics[characteristicKey] !== '' 
+      ? characteristics[characteristicKey] 
+      : 11;
   };
 
   const hasHighSpecialization = (characteristicKey) => {

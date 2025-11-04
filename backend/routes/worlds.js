@@ -39,6 +39,12 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
     minAttributes: null, // null = off, or number (default: 3)
     maxAttributes: null, // null = off, or number (default: 18)
     varierandeVikt: true,
+    primitiveAllowed: true, // If true, primitive culture is available
+    civilizedAllowed: true, // If true, civilized culture is available
+    // XOR logic: if only one is true, player is forced to that choice
+    // If both are true or both are false, player can choose
+    currentYear: 2967, // Current year in the game world
+    defaultCalendar: 'Asharisk', // Default calendar: Colonisk, Jargisk, or Asharisk
     ...(settings || {})
   };
 

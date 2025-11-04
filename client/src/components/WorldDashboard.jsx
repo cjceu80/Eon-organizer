@@ -38,7 +38,10 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import RaceSelectionDialog from './RaceSelectionDialog';
 import StatRollingDialog from './StatRollingDialog';
 import CharacteristicsDialog from './CharacteristicsDialog';
+import BirthDialog from './BirthDialog';
 import AgeCalculationDialog from './AgeCalculationDialog';
+import SiblingsDialog from './SiblingsDialog';
+import ParentsDialog from './ParentsDialog';
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -172,6 +175,9 @@ function PlayersTab({ worldId, world }) {
   const [showRaceSelectionDialog, setShowRaceSelectionDialog] = useState(false);
   const [showStatRollingDialog, setShowStatRollingDialog] = useState(false);
   const [showCharacteristicsDialog, setShowCharacteristicsDialog] = useState(false);
+  const [showBirthDialog, setShowBirthDialog] = useState(false);
+  const [showSiblingsDialog, setShowSiblingsDialog] = useState(false);
+  const [showParentsDialog, setShowParentsDialog] = useState(false);
   const [showAgeCalculationDialog, setShowAgeCalculationDialog] = useState(false);
   const [showCreateCharacterDialog, setShowCreateCharacterDialog] = useState(false);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -180,7 +186,13 @@ function PlayersTab({ worldId, world }) {
   const [selectedRace, setSelectedRace] = useState(null);
   const [rolledStats, setRolledStats] = useState(null);
   const [characteristicsData, setCharacteristicsData] = useState(null);
+  const [backgroundData, setBackgroundData] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [siblingsData, setSiblingsData] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [parentsData, setParentsData] = useState(null);
   const [ageData, setAgeData] = useState(null);
+  const [raceCategory, setRaceCategory] = useState(null);
   const [creating, setCreating] = useState(false);
   const [characterToDelete, setCharacterToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -202,7 +214,7 @@ function PlayersTab({ worldId, world }) {
   }, [getStorageKey]);
 
   // Save character creation data to localStorage
-  const saveCharacterCreationData = useCallback((race, name, bio, stats = null, characteristics = null) => {
+  const saveCharacterCreationData = useCallback((race, name, bio, stats = null, characteristics = null, background = null) => {
     try {
       const data = {
         worldId,
@@ -211,6 +223,7 @@ function PlayersTab({ worldId, world }) {
         bio: bio || '',
         stats: stats || null,
         characteristics: characteristics || null,
+        background: background || null,
         timestamp: Date.now()
       };
       localStorage.setItem(getStorageKey(), JSON.stringify(data));
@@ -346,11 +359,75 @@ function PlayersTab({ worldId, world }) {
   const handleCharacteristicsConfirmed = (characteristicsResult) => {
     setCharacteristicsData(characteristicsResult);
     setShowCharacteristicsDialog(false);
-    setShowCreateCharacterDialog(true);
+    setShowBirthDialog(true);
     // Save characteristics to localStorage
     const savedData = loadCharacterCreationData();
     if (savedData) {
       savedData.characteristics = characteristicsResult;
+      localStorage.setItem(getStorageKey(), JSON.stringify(savedData));
+    }
+  };
+
+  const handleBackgroundConfirmed = async (backgroundResult) => {
+    setBackgroundData(backgroundResult);
+    setShowBirthDialog(false);
+    // Fetch race category for sibling formula
+    await fetchRaceCategory();
+    setShowSiblingsDialog(true);
+    // Save background to localStorage
+    const savedData = loadCharacterCreationData();
+    if (savedData) {
+      savedData.background = backgroundResult;
+      localStorage.setItem(getStorageKey(), JSON.stringify(savedData));
+    }
+  };
+
+  const fetchRaceCategory = async () => {
+    if (!selectedRace || !selectedRace.category || !world) {
+      setRaceCategory(null);
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/race-categories/${world.ruleset || 'EON'}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const category = data.categories?.find(cat => cat.name === selectedRace.category);
+        setRaceCategory(category || null);
+      } else {
+        setRaceCategory(null);
+      }
+    } catch (err) {
+      console.error('Error fetching race category:', err);
+      setRaceCategory(null);
+    }
+  };
+
+  const handleSiblingsConfirmed = (siblingsResult) => {
+    setSiblingsData(siblingsResult);
+    setShowSiblingsDialog(false);
+    setShowParentsDialog(true);
+    // Save siblings to localStorage
+    const savedData = loadCharacterCreationData();
+    if (savedData) {
+      savedData.siblings = siblingsResult;
+      localStorage.setItem(getStorageKey(), JSON.stringify(savedData));
+    }
+  };
+
+  const handleParentsConfirmed = (parentsResult) => {
+    setParentsData(parentsResult);
+    setShowParentsDialog(false);
+    setShowCreateCharacterDialog(true);
+    // Save parents to localStorage
+    const savedData = loadCharacterCreationData();
+    if (savedData) {
+      savedData.parents = parentsResult;
       localStorage.setItem(getStorageKey(), JSON.stringify(savedData));
     }
   };
@@ -376,18 +453,24 @@ function PlayersTab({ worldId, world }) {
             // If we have stats, continue to next step
             if (savedData.stats) {
               setRolledStats(savedData.stats);
-              // If we have age data, continue to next step
-              if (savedData.ageData) {
-                setAgeData(savedData.ageData);
-                // If we have characteristics, go to final dialog, otherwise go to characteristics
-                if (savedData.characteristics) {
-                  setCharacteristicsData(savedData.characteristics);
-                  setShowCreateCharacterDialog(true);
+              // If we have characteristics, continue to next step
+              if (savedData.characteristics) {
+                setCharacteristicsData(savedData.characteristics);
+                // If we have background, continue to next step
+                if (savedData.background) {
+                  setBackgroundData(savedData.background);
+                  // If we have age data, go to final dialog, otherwise go to age calculation
+                  if (savedData.ageData) {
+                    setAgeData(savedData.ageData);
+                    setShowCreateCharacterDialog(true);
+                  } else {
+                    setShowAgeCalculationDialog(true);
+                  }
                 } else {
-                  setShowCharacteristicsDialog(true);
+                  setShowBirthDialog(true);
                 }
               } else {
-                setShowAgeCalculationDialog(true);
+                setShowCharacteristicsDialog(true);
               }
             } else {
               setShowStatRollingDialog(true);
@@ -416,6 +499,7 @@ function PlayersTab({ worldId, world }) {
     setCharacterBio('');
     setRolledStats(null);
     setCharacteristicsData(null);
+    setBackgroundData(null);
     setAgeData(null);
     setShowResumeDialog(false);
     setShowRaceSelectionDialog(true);
@@ -427,7 +511,7 @@ function PlayersTab({ worldId, world }) {
 
   const handleCreateCharacter = async (e) => {
     e.preventDefault();
-    if (!characterName.trim() || !selectedRace || !rolledStats || !characteristicsData || !ageData) return;
+    if (!characterName.trim() || !selectedRace || !rolledStats || !characteristicsData || !backgroundData || !ageData) return;
 
     setCreating(true);
     try {
@@ -455,7 +539,8 @@ function PlayersTab({ worldId, world }) {
             weight: ageData?.weight,
             lengthRollDetails: ageData?.lengthRollDetails,
             characteristics: characteristicsData?.characteristics || {},
-            specializations: characteristicsData?.specializations || {}
+            specializations: characteristicsData?.specializations || {},
+            background: backgroundData || {}
           }
         })
       });
@@ -467,6 +552,7 @@ function PlayersTab({ worldId, world }) {
         setSelectedRace(null);
         setRolledStats(null);
         setCharacteristicsData(null);
+        setBackgroundData(null);
         setAgeData(null);
         clearCharacterCreationData(); // Clear localStorage on successful creation
         fetchCharacters(); // Refresh the list
@@ -651,9 +737,46 @@ function PlayersTab({ worldId, world }) {
         open={showCharacteristicsDialog}
         onClose={() => {
           setShowCharacteristicsDialog(false);
-          // Go back to age calculation if user cancels
+          // Go back to stat rolling if user cancels
         }}
         onConfirm={handleCharacteristicsConfirmed}
+      />
+
+      <BirthDialog
+        open={showBirthDialog}
+        onClose={() => {
+          setShowBirthDialog(false);
+          // Go back to characteristics if user cancels
+        }}
+        onConfirm={handleBackgroundConfirmed}
+        worldSettings={world?.settings || {}}
+        ageData={ageData}
+      />
+
+      <SiblingsDialog
+        open={showSiblingsDialog}
+        onClose={() => {
+          setShowSiblingsDialog(false);
+          // Go back to birth dialog if user cancels
+        }}
+        onConfirm={handleSiblingsConfirmed}
+        ageData={ageData}
+        selectedRace={selectedRace}
+        raceCategory={raceCategory}
+        rerolls={world?.settings?.rerolls || 0}
+      />
+
+      <ParentsDialog
+        open={showParentsDialog}
+        onClose={() => {
+          setShowParentsDialog(false);
+          // Go back to siblings dialog if user cancels
+        }}
+        onConfirm={handleParentsConfirmed}
+        ageData={ageData}
+        selectedRace={selectedRace}
+        raceCategory={raceCategory}
+        rerolls={world?.settings?.rerolls || 0}
       />
 
       {/* Create Character Dialog */}

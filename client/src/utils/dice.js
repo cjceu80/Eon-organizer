@@ -17,6 +17,22 @@ function rollD10() {
 }
 
 /**
+ * Roll a single T10 (d10, 1-10)
+ */
+export function rollT10() {
+  return rollD10();
+}
+
+/**
+ * Roll multiple T10 dice
+ * @param {number} count - Number of T10 rolls
+ * @returns {Array<number>} Array of roll results
+ */
+export function rollT10Multiple(count) {
+  return Array.from({ length: count }, () => rollT10());
+}
+
+/**
  * Roll a single d6 (1-6)
  */
 function rollD6() {
