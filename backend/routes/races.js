@@ -2,7 +2,7 @@ import express from 'express';
 import Race from '../models/Race.js';
 import World from '../models/World.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { isWorldAdmin, canAccessWorld } from '../middleware/worldPermissions.js';
+import { isWorldAdmin, canAccessWorld, checkIsWorldAdmin, checkCanAccessWorld } from '../middleware/worldPermissions.js';
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ router.get('/world/:worldId', authenticateToken, asyncHandler(async (req, res) =
   }
 
   // Check access
-  const hasAccess = await canAccessWorld(req.user.id, world);
+  const hasAccess = await checkCanAccessWorld(req.user.id, world);
   if (!hasAccess) {
     return res.status(403).json({ message: 'Access denied to this world' });
   }
@@ -48,7 +48,7 @@ router.get('/:raceId', authenticateToken, asyncHandler(async (req, res) => {
 
   // Check if user has access - ruleset-wide races are accessible to all users
   if (race.world !== null) {
-    const hasAccess = await canAccessWorld(req.user.id, race.world);
+    const hasAccess = await checkCanAccessWorld(req.user.id, race.world);
     if (!hasAccess) {
       return res.status(403).json({ message: 'Access denied to this world' });
     }
@@ -73,21 +73,24 @@ router.post('/world/:worldId', authenticateToken, asyncHandler(async (req, res) 
     return res.status(404).json({ message: 'World not found' });
   }
 
-  const isAdmin = await isWorldAdmin(req.user.id, world);
+  const isAdmin = await checkIsWorldAdmin(req.user.id, world);
   if (!isAdmin) {
     return res.status(403).json({ message: 'Only world admin can create races' });
   }
 
-  // Check if race with same name already exists in this world or ruleset-wide
+  // Check if race with same name already exists in this world or ruleset-wide (same category)
+  // For world-specific races, check world+name
+  // For ruleset-wide races, check ruleset+category+name
+  const categoryValue = category?.trim() || '';
   const existingRace = await Race.findOne({ 
     $or: [
-      { world: worldId, name: name.trim() },
-      { world: null, ruleset: world.ruleset, name: name.trim() }
+      { world: worldId, name: name.trim() }, // World-specific: check world+name
+      { world: null, ruleset: world.ruleset, category: categoryValue, name: name.trim() } // Ruleset-wide: check ruleset+category+name
     ]
   });
 
   if (existingRace) {
-    return res.status(400).json({ message: 'A race with this name already exists' });
+    return res.status(400).json({ message: 'A race with this name already exists' + (categoryValue ? ` in category '${categoryValue}'` : '') });
   }
 
   // Create race with modifiers and auto-populate ruleset from world
@@ -125,7 +128,7 @@ router.put('/:raceId', authenticateToken, asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Ruleset-wide races cannot be updated via API' });
   }
   
-  const isAdmin = await isWorldAdmin(req.user.id, race.world);
+  const isAdmin = await checkIsWorldAdmin(req.user.id, race.world);
   if (!isAdmin) {
     return res.status(403).json({ message: 'Only world admin can update races' });
   }
@@ -153,18 +156,36 @@ router.put('/:raceId', authenticateToken, asyncHandler(async (req, res) => {
     });
   }
 
-  // Check for duplicate name if name was changed
-  if (name !== undefined) {
-    const existingRace = await Race.findOne({ 
-      world: race.world._id || race.world,
-      name: name.trim(),
-      _id: { $ne: raceId }
-    });
+      // Check for duplicate name if name or category was changed
+      if (name !== undefined || category !== undefined) {
+        const updateName = name !== undefined ? name.trim() : race.name;
+        const updateCategory = category !== undefined ? (category.trim() || '') : (race.category || '');
+        
+        let existingRace;
+        if (race.world === null) {
+          // Ruleset-wide: check ruleset+category+name
+          existingRace = await Race.findOne({ 
+            world: null,
+            ruleset: race.ruleset,
+            category: updateCategory,
+            name: updateName,
+            _id: { $ne: raceId }
+          });
+        } else {
+          // World-specific: check world+name (category doesn't matter for world-specific)
+          existingRace = await Race.findOne({ 
+            world: race.world._id || race.world,
+            name: updateName,
+            _id: { $ne: raceId }
+          });
+        }
 
-    if (existingRace) {
-      return res.status(400).json({ message: 'A race with this name already exists in this world' });
-    }
-  }
+        if (existingRace) {
+          return res.status(400).json({ 
+            message: 'A race with this name already exists' + (race.world === null && updateCategory ? ` in category '${updateCategory}'` : ' in this world') 
+          });
+        }
+      }
 
   await race.save();
   
@@ -190,7 +211,7 @@ router.delete('/:raceId', authenticateToken, asyncHandler(async (req, res) => {
   }
   
   // Check if user is admin of the world
-  const isAdmin = await isWorldAdmin(req.user.id, race.world);
+  const isAdmin = await checkIsWorldAdmin(req.user.id, race.world);
   if (!isAdmin) {
     return res.status(403).json({ message: 'Only world admin can delete races' });
   }

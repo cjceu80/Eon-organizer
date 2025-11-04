@@ -30,14 +30,25 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'You already have a world with this name' });
   }
 
-  // Create world
+  // Create world with default settings
+  const defaultSettings = {
+    statRollMethod: 'standard',
+    rerolls: 0,
+    freeSelections: 0,
+    feminineAttributes: false,
+    minAttributes: null, // null = off, or number (default: 3)
+    maxAttributes: null, // null = off, or number (default: 18)
+    varierandeVikt: true,
+    ...(settings || {})
+  };
+
   const world = new World({
     name: name.trim(),
     description: description || '',
     admin: req.user.id,
     isPublic: isPublic || false,
     ruleset: ruleset || 'EON',
-    settings: settings || {}
+    settings: defaultSettings
   });
 
   await world.save();
@@ -77,17 +88,36 @@ router.get('/:worldId', authenticateToken, canAccessWorld, asyncHandler(async (r
 router.put('/:worldId', authenticateToken, isWorldAdmin, asyncHandler(async (req, res) => {
   const { name, description, isPublic, settings } = req.body;
   
+  const world = await World.findById(req.params.worldId);
+  if (!world) {
+    return res.status(404).json({ message: 'World not found' });
+  }
+
   const updateData = {};
   if (name !== undefined) updateData.name = name.trim();
   if (description !== undefined) updateData.description = description;
   if (isPublic !== undefined) updateData.isPublic = isPublic;
-  if (settings !== undefined) updateData.settings = settings;
+  if (settings !== undefined) {
+    // Merge with existing settings to preserve other settings
+    // Handle both Map and plain object
+    const currentSettings = world.settings instanceof Map 
+      ? Object.fromEntries(world.settings) 
+      : (world.settings || {});
+    const mergedSettings = { ...currentSettings, ...settings };
+    
+    // Clear and rebuild the settings Map to ensure all values are updated
+    world.settings.clear();
+    Object.entries(mergedSettings).forEach(([k, v]) => {
+      world.settings.set(k, v);
+    });
+  }
 
-  const world = await World.findByIdAndUpdate(
-    req.params.worldId,
-    updateData,
-    { new: true, runValidators: true }
-  );
+  // Update other fields
+  if (name !== undefined) world.name = name.trim();
+  if (description !== undefined) world.description = description;
+  if (isPublic !== undefined) world.isPublic = isPublic;
+
+  await world.save();
 
   res.json({
     message: 'World updated successfully',

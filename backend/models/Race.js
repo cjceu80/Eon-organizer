@@ -44,14 +44,24 @@ const raceSchema = new mongoose.Schema({
 // Index for faster queries
 raceSchema.index({ world: 1 });
 raceSchema.index({ ruleset: 1 });
-raceSchema.index({ ruleset: 1, name: 1 }, { unique: true, partialFilterExpression: { world: null } }); // Unique ruleset-wide races
-raceSchema.index({ world: 1, name: 1 }, { unique: true, partialFilterExpression: { world: { $ne: null } } }); // Unique world-specific races
+raceSchema.index({ ruleset: 1, category: 1, name: 1 }, { unique: true, partialFilterExpression: { world: null } }); // Unique ruleset-wide races per category
+raceSchema.index({ world: 1, name: 1 }, { unique: true, partialFilterExpression: { world: { $exists: true, $type: 'objectId' } } }); // Unique world-specific races
 
 // Convert _id to id for consistency and handle reference fields
 raceSchema.methods.toJSON = function() {
-  const obj = this.toObject();
+  const obj = this.toObject({ flattenMaps: true });
   obj.id = obj._id.toString();
   delete obj._id;
+  
+  // Convert modifiers Map to plain object if needed (fallback if flattenMaps didn't work)
+  if (obj.modifiers && obj.modifiers instanceof Map) {
+    obj.modifiers = Object.fromEntries(obj.modifiers);
+  }
+  
+  // Convert metadata Map to plain object if needed
+  if (obj.metadata && obj.metadata instanceof Map) {
+    obj.metadata = Object.fromEntries(obj.metadata);
+  }
   
   // Convert world ObjectId to string if not populated
   if (obj.world && typeof obj.world === 'object') {

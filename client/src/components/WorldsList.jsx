@@ -33,6 +33,9 @@ export default function WorldsList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [worldName, setWorldName] = useState('');
   const [selectedRuleset, setSelectedRuleset] = useState('EON');
+  const [statRollMethod, setStatRollMethod] = useState('standard');
+  const [rerolls, setRerolls] = useState(0);
+  const [freeSelections, setFreeSelections] = useState(0);
   const [creating, setCreating] = useState(false);
   const [worldToDelete, setWorldToDelete] = useState(null);
   const [deletingWorld, setDeletingWorld] = useState(false);
@@ -101,13 +104,24 @@ export default function WorldsList() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ name: worldName, ruleset: selectedRuleset })
+        body: JSON.stringify({ 
+          name: worldName, 
+          ruleset: selectedRuleset,
+          settings: {
+            statRollMethod,
+            rerolls,
+            freeSelections
+          }
+        })
       });
 
       if (response.ok) {
         setShowCreateDialog(false);
         setWorldName('');
         setSelectedRuleset('EON');
+        setStatRollMethod('standard');
+        setRerolls(0);
+        setFreeSelections(0);
         fetchWorlds();
       } else {
         const errorData = await response.json();
@@ -259,9 +273,58 @@ export default function WorldsList() {
               value={selectedRuleset}
               onChange={(e) => setSelectedRuleset(e.target.value)}
               disabled={creating}
+              sx={{ mb: 2 }}
             >
               <MenuItem value="EON">EON</MenuItem>
             </TextField>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+              Karaktärskapande - Inställningar
+            </Typography>
+            <TextField
+              margin="dense"
+              id="statRollMethod"
+              label="Attributrullning"
+              select
+              fullWidth
+              variant="outlined"
+              value={statRollMethod}
+              onChange={(e) => setStatRollMethod(e.target.value)}
+              disabled={creating}
+              helperText="Välj metod för att rulla huvudattribut"
+              sx={{ mb: 2 }}
+            >
+              <MenuItem value="standard">Standard</MenuItem>
+              <MenuItem value="anpassad">Anpassad</MenuItem>
+              <MenuItem value="höga attribut">Höga attribut</MenuItem>
+              <MenuItem value="hjälteattribut">Hjälteattribut</MenuItem>
+            </TextField>
+            <TextField
+              margin="dense"
+              id="rerolls"
+              label="Omrullningar"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={rerolls}
+              onChange={(e) => setRerolls(Math.max(0, parseInt(e.target.value) || 0))}
+              disabled={creating}
+              inputProps={{ min: 0 }}
+              helperText="Antal gånger spelare kan rulla om attribut"
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              margin="dense"
+              id="freeSelections"
+              label="Fria val"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={freeSelections}
+              onChange={(e) => setFreeSelections(Math.max(0, parseInt(e.target.value) || 0))}
+              disabled={creating}
+              inputProps={{ min: 0 }}
+              helperText="Antal attribut som kan väljas fritt"
+            />
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreateDialog(false)} disabled={creating}>

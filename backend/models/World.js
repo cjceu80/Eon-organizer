@@ -44,12 +44,28 @@ worldSchema.index({ isPublic: 1 });
 
 // Convert _id to id for consistency and handle admin field
 worldSchema.methods.toJSON = function() {
-  const obj = this.toObject();
+  const obj = this.toObject({ flattenMaps: true });
   obj.id = obj._id.toString();
   delete obj._id;
-  // Convert admin ObjectId to string if it exists
-  if (obj.admin && obj.admin.toString) {
-    obj.admin = obj.admin.toString();
+  // Handle admin field - could be ObjectId, populated object, or already converted
+  if (obj.admin) {
+    // If admin is populated (object with _id or id) - keep the object structure
+    if (typeof obj.admin === 'object' && !(obj.admin instanceof mongoose.Types.ObjectId)) {
+      // Populated admin object - ensure _id is converted to id
+      if (obj.admin._id && !obj.admin.id) {
+        obj.admin.id = obj.admin._id.toString();
+        delete obj.admin._id;
+      }
+      // Keep the populated object as-is (it will have id, username, email)
+    } else if (obj.admin instanceof mongoose.Types.ObjectId || (obj.admin.toString && typeof obj.admin.toString === 'function' && !obj.admin.username)) {
+      // ObjectId - convert to string ID
+      obj.admin = obj.admin.toString();
+    }
+    // If it's already a string, leave it as is
+  }
+  // Ensure settings is a plain object (not a Map)
+  if (obj.settings && obj.settings instanceof Map) {
+    obj.settings = Object.fromEntries(obj.settings);
   }
   return obj;
 };
