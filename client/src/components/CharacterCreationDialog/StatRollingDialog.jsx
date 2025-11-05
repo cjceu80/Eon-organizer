@@ -30,7 +30,7 @@ import {
   EON_ATTRIBUTES, 
   rollStatsForMethod,
   rollT6Multiple
-} from '../utils/dice';
+} from '../../utils/dice';
 
 export default function StatRollingDialog({ 
   open, 

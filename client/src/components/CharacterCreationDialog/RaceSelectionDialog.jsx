@@ -20,9 +20,9 @@ import {
   Paper
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth';
 
-import { EON_ATTRIBUTES } from '../utils/dice';
+import { EON_ATTRIBUTES } from '../../utils/dice';
 
 export default function RaceSelectionDialog({ open, onClose, worldId, onRaceSelected, initialRaceId = null }) {
   const { token } = useAuth();

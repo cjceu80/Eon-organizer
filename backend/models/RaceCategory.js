@@ -22,11 +22,26 @@ const raceCategorySchema = new mongoose.Schema({
   },
   // Apparent age table for this category/ruleset
   // Store ranges: [{ minActualAge, maxActualAge, apparentAge }]
+  // Alternative: Use apparentAgeFormula and actualAgeFromApparentFormula for mathematical formulas
   apparentAgeTable: [{
     minActualAge: { type: Number, required: true },
     maxActualAge: { type: Number, required: true },
     apparentAge: { type: Number, required: true }
   }],
+  // Apparent age formula (forward): JavaScript expression using 'actualAge' variable
+  // Example: "2.5 * Math.pow(actualAge, 0.26) - 4.7"
+  // Takes precedence over apparentAgeTable if both are set
+  apparentAgeFormula: {
+    type: String,
+    required: false
+  },
+  // Actual age from apparent formula (inverse): JavaScript expression using 'apparentAge' variable
+  // Example: "Math.pow((apparentAge + 4.7) / 2.5, 1 / 0.26)"
+  // Takes precedence over apparentAgeTable if both are set
+  actualAgeFromApparentFormula: {
+    type: String,
+    required: false
+  },
   // Divisor for exhaustion columns calculation: (TÅL + VIL) / exhaustionColumnDivisor
   exhaustionColumnDivisor: {
     type: Number,
@@ -72,6 +87,14 @@ const raceCategorySchema = new mongoose.Schema({
         { min: 96, max: 999, result: 'both dead' }
       ]
     }
+  },
+  // Parent age formula for calculating living parent age
+  // Can also be set at the race level in Race.metadata.parentAgeFormula (takes precedence over category)
+  // Default: 'oldestSiblingOrCharacterApparentAge + 14 + Ob2T6'
+  // Formula uses the variable: oldestSiblingOrCharacterApparentAge (apparent age of oldest sibling, or character if no older siblings)
+  parentAgeFormula: {
+    type: String,
+    required: false
   }
 }, { timestamps: true });
 
@@ -80,28 +103,75 @@ raceCategorySchema.index({ ruleset: 1, name: 1 }, { unique: true });
 
 /**
  * Calculate apparent age from actual age
- * If no apparentAgeTable is set or empty, returns actual age (default behavior)
- * Otherwise, looks up the matching range in the table
+ * Priority: apparentAgeFormula > apparentAgeTable > default (actual = apparent)
  * @param {Number} actualAge - The actual age of the character
  * @returns {Number} - The apparent age
  */
 raceCategorySchema.methods.calculateApparentAge = function(actualAge) {
-  // Default behavior: if no table set, apparent = actual
-  if (!this.apparentAgeTable || this.apparentAgeTable.length === 0) {
-    return actualAge;
+  // First, try formula if available
+  if (this.apparentAgeFormula) {
+    try {
+      // Evaluate the formula with actualAge and Math as variables (Math needs to be passed explicitly)
+      const apparentAge = Function('actualAge', 'Math', `return (${this.apparentAgeFormula})`)(actualAge, Math);
+      return Math.round(apparentAge); // Round to whole number
+    } catch (err) {
+      console.error('Error evaluating apparentAgeFormula:', err);
+      // Fall through to table or default
+    }
   }
 
-  // Find matching range in the table
-  const matchingRange = this.apparentAgeTable.find(
-    range => actualAge >= range.minActualAge && actualAge <= range.maxActualAge
-  );
+  // Second, try table if available
+  if (this.apparentAgeTable && this.apparentAgeTable.length > 0) {
+    const matchingRange = this.apparentAgeTable.find(
+      range => actualAge >= range.minActualAge && actualAge <= range.maxActualAge
+    );
 
-  // If no match found, return actual age as fallback
-  if (!matchingRange) {
-    return actualAge;
+    if (matchingRange) {
+      return Math.round(matchingRange.apparentAge); // Round to whole number (table values should already be integers, but ensure rounding)
+    }
   }
 
-  return matchingRange.apparentAge;
+  // Default: apparent = actual (already whole number)
+  return Math.round(actualAge);
+};
+
+/**
+ * Calculate actual age from apparent age
+ * Priority: actualAgeFromApparentFormula > apparentAgeTable > default (actual = apparent)
+ * @param {Number} apparentAge - The apparent age of the character
+ * @returns {Number} - The actual age
+ */
+raceCategorySchema.methods.calculateActualAgeFromApparent = function(apparentAge) {
+  // First, try formula if available
+  if (this.actualAgeFromApparentFormula) {
+    try {
+      // Evaluate the formula with apparentAge and Math as variables (Math needs to be passed explicitly)
+      const actualAge = Function('apparentAge', 'Math', `return (${this.actualAgeFromApparentFormula})`)(apparentAge, Math);
+      return Math.round(actualAge);
+    } catch (err) {
+      console.error('Error evaluating actualAgeFromApparentFormula:', err);
+      // Fall through to table or default
+    }
+  }
+
+  // Second, try table if available
+  if (this.apparentAgeTable && this.apparentAgeTable.length > 0) {
+    // Find all ranges that match this apparent age
+    const matchingRanges = this.apparentAgeTable.filter(
+      range => range.apparentAge === apparentAge
+    );
+
+    if (matchingRanges.length > 0) {
+      // Pick one randomly if multiple match
+      const selectedRange = matchingRanges[Math.floor(Math.random() * matchingRanges.length)];
+      const minAge = selectedRange.minActualAge;
+      const maxAge = selectedRange.maxActualAge;
+      return Math.floor(Math.random() * (maxAge - minAge + 1)) + minAge;
+    }
+  }
+
+  // Default: actual = apparent
+  return apparentAge;
 };
 
 raceCategorySchema.methods.toJSON = function() {

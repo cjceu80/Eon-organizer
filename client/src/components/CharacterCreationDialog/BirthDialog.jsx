@@ -27,7 +27,7 @@ import {
   Alert
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { rollT100WithDetails, rollT10 } from '../utils/dice';
+import { rollT100WithDetails, rollT10 } from '../../utils/dice';
 
 export default function BirthDialog({
   open,
@@ -290,7 +290,6 @@ export default function BirthDialog({
       return;
     }
     onConfirm({
-      cultureType: 'civilized',
       month: {
         roll: monthRoll,
         selected: selectedMonth

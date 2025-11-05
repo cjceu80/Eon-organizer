@@ -23,7 +23,7 @@ import {
   Chip
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { rollT6Multiple } from '../utils/dice';
+import { rollT6Multiple } from '../../utils/dice';
 
 const CHARACTERISTICS = [
   { key: 'Lojalitet', fixed: false },
@@ -346,7 +346,6 @@ export default function CharacteristicsDialog({
               })}
               
               {CHARACTERISTICS.filter(char => !char.fixed).every(char => {
-                const value = getValue(char.key);
                 return !(hasHighSpecialization(char.key) || hasLowSpecialization(char.key));
               }) && (
                 <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>

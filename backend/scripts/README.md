@@ -14,14 +14,32 @@ Seeds default ruleset-wide races that will be available to all worlds using that
 
 ### Usage
 
-**Manually run:**
-```bash
-# From inside the backend container
-docker exec eon-backend node scripts/seedDefaultRaces.js
+**Recommended: Run locally from host machine** (fastest, always uses latest code):
+```powershell
+# From backend directory - uses helper script
+cd backend
+.\seed.ps1
 
-# Or from backend directory locally
-node scripts/seedDefaultRaces.js
+# Or directly with npm
+npm run seed
+# (Note: requires MONGODB_URI environment variable set to mongodb://localhost:27017/eon-organizer)
 ```
+
+**Alternative: Run from inside container** (slower, may use cached modules):
+```bash
+docker exec eon-backend node scripts/seedDefaultRaces.js
+```
+
+**Why run locally?**
+- ✅ Always uses the latest code from your filesystem
+- ✅ No Docker exec overhead or module caching issues
+- ✅ Faster iteration when testing schema changes
+- ✅ Same connection to MongoDB (Docker exposes port 27017)
+
+**Prerequisites for local execution:**
+- Node.js installed on your host machine
+- Backend dependencies installed (`npm install` in `backend/` directory)
+- MongoDB container running and accessible on `localhost:27017`
 
 **What it does:**
 - Checks for existing ruleset-wide races to avoid duplicates

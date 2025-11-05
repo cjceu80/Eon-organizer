@@ -21,10 +21,14 @@ const defaultRaceCategories = {
       name: 'ExampleCategory',
       description: 'Description for example category.',
       exhaustionColumnDivisor: 1, // Divisor for exhaustion columns: (TÅL + VIL) / exhaustionColumnDivisor
+      // Option 1: Use apparentAgeTable (lookup table)
       apparentAgeTable: [
         { minActualAge: 0, maxActualAge: 10, apparentAge: 10 },
         { minActualAge: 11, maxActualAge: 20, apparentAge: 15 }
       ],
+      // Option 2: Use formulas instead of table (formulas take precedence if both are set)
+      // apparentAgeFormula: '2.5 * Math.pow(actualAge, 0.26) - 4.7',
+      // actualAgeFromApparentFormula: 'Math.pow((apparentAge + 4.7) / 2.5, 1 / 0.26)',
       // Optional: Sibling formula for this category (used as fallback for races without their own formula)
       siblingFormula: {
         numberOfLitters: 'Ob1T6-2',
@@ -57,7 +61,11 @@ const defaultRaceCategories = {
           { min: 89, max: 95, result: 'father alive' },
           { min: 96, max: 999, result: 'both dead' }
         ]
-      }
+      },
+      // Optional: Parent age formula for this category
+      // Default is 'oldestSiblingOrCharacterApparentAge + 14 + Ob2T6'
+      // Example override: Alver (Elves) might have different parent age calculation
+      // parentAgeFormula: 'oldestSiblingOrCharacterApparentAge + 20 + Ob3T6'
     }
     // Add more EON categories here as needed
   ]
@@ -101,7 +109,11 @@ const defaultRaces = {
         ['parentFormula', {
           formula: '1T100', // Example: override formula for this specific race
           // table: [...] // Omit to use default table, or provide custom table
-        }]
+        }],
+        // Optional: Parent age formula specific to this race
+        // Default is 'oldestSiblingOrCharacterApparentAge + 14 + Ob2T6'
+        // Example: Some races might have different parent age calculation
+        // ['parentAgeFormula', 'oldestSiblingOrCharacterApparentAge + 20 + Ob3T6']
       ])
     }
     // Add more EON races here as needed

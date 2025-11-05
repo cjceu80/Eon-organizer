@@ -22,7 +22,7 @@ import {
   Grid
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { rollObT6WithDetails, rollT6Multiple } from '../utils/dice';
+import { rollObT6WithDetails, rollT6Multiple } from '../../utils/dice';
 
 // Age bonus table
 const AGE_BONUS_TABLE = [
@@ -67,6 +67,42 @@ const KROPPSBYGGNAD_WEIGHT_MULTIPLIER = {
   'Massiv': 1.2
 };
 
+/**
+ * Calculate apparent age from actual age
+ * Priority: apparentAgeFormula > apparentAgeTable > default (actual = apparent)
+ * @param {Number} actualAge - The actual age
+ * @param {Object} raceCategory - Race category object with apparentAgeFormula, actualAgeFromApparentFormula, or apparentAgeTable
+ * @returns {Number} - The apparent age
+ */
+function calculateApparentAge(actualAge, raceCategory) {
+  // First, try formula if available
+  if (raceCategory?.apparentAgeFormula) {
+    try {
+      // Evaluate the formula with actualAge and Math as variables (Math needs to be passed explicitly)
+      const apparentAge = Function('actualAge', 'Math', `return (${raceCategory.apparentAgeFormula})`)(actualAge, Math);
+      return Math.round(apparentAge); // Round to whole number
+    } catch (err) {
+      console.error('Error evaluating apparentAgeFormula:', err);
+      // Fall through to table or default
+    }
+  }
+
+  // Second, try table if available
+  const apparentAgeTable = raceCategory?.apparentAgeTable || [];
+  if (apparentAgeTable.length > 0) {
+    const matchingRange = apparentAgeTable.find(
+      range => actualAge >= range.minActualAge && actualAge <= range.maxActualAge
+    );
+
+    if (matchingRange) {
+      return Math.round(matchingRange.apparentAge); // Round to whole number (table values should already be integers, but ensure rounding)
+    }
+  }
+
+  // Default: apparent = actual (already whole number)
+  return Math.round(actualAge);
+}
+
 export default function AgeCalculationDialog({ 
   open, 
   onClose, 
@@ -74,6 +110,7 @@ export default function AgeCalculationDialog({
   attributes,
   rerolls = 0,
   selectedRace = null,
+  raceCategory = null,
   gender = 'man',
   varierandeVikt = true
 }) {
@@ -100,6 +137,18 @@ export default function AgeCalculationDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, rerolls]);
+  
+  // Recalculate apparent age when raceCategory loads (if age was already calculated)
+  useEffect(() => {
+    if (open && ageResult && raceCategory && (raceCategory.apparentAgeFormula || (raceCategory.apparentAgeTable && raceCategory.apparentAgeTable.length > 0))) {
+      const apparentAge = calculateApparentAge(ageResult.age, raceCategory);
+      setAgeResult(prev => ({
+        ...prev,
+        apparentAge
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceCategory, open]);
 
   // Calculate length after kroppsbyggnad is set (since weight depends on kroppsbyggnad type)
   // Note: handleRollKroppsbyggnad now calls handleRollLength directly with shared dice,
@@ -118,11 +167,24 @@ export default function AgeCalculationDialog({
     const ob3T6Result = rollObT6WithDetails(3);
     const age = bilValue + ob3T6Result.total;
     const bonus = getAgeBonus(age);
+    
+    // Calculate apparent age from actual age
+    const apparentAge = calculateApparentAge(age, raceCategory);
+    
+    // Debug logging
+    console.log('AgeCalculationDialog - handleRollAge:', {
+      age,
+      apparentAge,
+      hasRaceCategory: !!raceCategory,
+      hasApparentAgeFormula: !!raceCategory?.apparentAgeFormula,
+      hasApparentAgeTable: !!raceCategory?.apparentAgeTable && raceCategory.apparentAgeTable.length > 0
+    });
 
     setAgeResult({
       bil: bilValue,
       ob3T6: ob3T6Result,
       age,
+      apparentAge,
       bonus
     });
   };
@@ -252,6 +314,7 @@ export default function AgeCalculationDialog({
     if (!ageResult || !kroppsbyggnadResult || !lengthResult) return;
     onConfirm({
       age: ageResult.age,
+      apparentAge: ageResult.apparentAge,
       ageBonus: ageResult.bonus,
       ageRollDetails: {
         bil: ageResult.bil,
@@ -287,7 +350,7 @@ export default function AgeCalculationDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>
         Beräkna ålder, kroppsbyggnad, längd och vikt
         {remainingRerolls > 0 && (
@@ -309,13 +372,13 @@ export default function AgeCalculationDialog({
                 Ålder
               </Typography>
               <Paper variant="outlined" sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
                   <Box>
                     <Typography variant="body2" color="text.secondary">BIL</Typography>
                     <Typography variant="h5">{ageResult.bil}</Typography>
                   </Box>
                   <Typography variant="h5">+</Typography>
-                  <Box sx={{ flex: 1, minWidth: 120 }}>
+                  <Box sx={{ flex: '0 0 auto', minWidth: 120 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2" color="text.secondary">Ob3T6</Typography>
                       {remainingRerolls > 0 && (
@@ -345,11 +408,22 @@ export default function AgeCalculationDialog({
                   </Box>
                   <Typography variant="h5">=</Typography>
                   <Box>
-                    <Typography variant="body2" color="text.secondary">Ålder</Typography>
+                    <Typography variant="body2" color="text.secondary">Verklig ålder</Typography>
                     <Typography variant="h4" color="primary.main" sx={{ fontWeight: 'bold' }}>
                       {ageResult.age}
                     </Typography>
                   </Box>
+                  {ageResult.apparentAge !== undefined && ageResult.apparentAge !== ageResult.age && (
+                    <>
+                      <Typography variant="h5">→</Typography>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Synlig ålder</Typography>
+                        <Typography variant="h4" color="secondary.main" sx={{ fontWeight: 'bold' }}>
+                          {ageResult.apparentAge}
+                        </Typography>
+                      </Box>
+                    </>
+                  )}
                 </Box>
               </Paper>
             </Box>
@@ -659,6 +733,7 @@ AgeCalculationDialog.propTypes = {
   attributes: PropTypes.object,
   rerolls: PropTypes.number,
   selectedRace: PropTypes.object,
+  raceCategory: PropTypes.object,
   gender: PropTypes.string,
   varierandeVikt: PropTypes.bool
 };
