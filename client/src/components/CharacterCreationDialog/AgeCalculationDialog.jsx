@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -104,9 +103,10 @@ function calculateApparentAge(actualAge, raceCategory) {
 }
 
 export default function AgeCalculationDialog({ 
-  open, 
   onClose, 
-  onConfirm, 
+  onConfirm,
+  onStateChange = null,
+  savedState = null,
   attributes,
   rerolls = 0,
   selectedRace = null,
@@ -120,41 +120,77 @@ export default function AgeCalculationDialog({
   const [remainingRerolls, setRemainingRerolls] = useState(rerolls);
   const [initialRoll, setInitialRoll] = useState(false);
 
-  // Initialize rolling when dialog opens
+  // Load saved state or initialize rolling
   useEffect(() => {
-    if (open && !initialRoll) {
+    if (savedState) {
+      // Restore from saved state
+      if (savedState.ageResult) setAgeResult(savedState.ageResult);
+      if (savedState.kroppsbyggnadResult) setKroppsbyggnadResult(savedState.kroppsbyggnadResult);
+      if (savedState.lengthResult) setLengthResult(savedState.lengthResult);
+      if (savedState.remainingRerolls !== undefined) setRemainingRerolls(savedState.remainingRerolls);
+      setInitialRoll(true);
+    } else if (!initialRoll) {
+      // No saved state, do initial rolls
       handleRollAge();
       handleRollKroppsbyggnad();
       setInitialRoll(true);
     }
-    if (!open) {
-      // Reset when dialog closes
-      setInitialRoll(false);
-      setAgeResult(null);
-      setKroppsbyggnadResult(null);
-      setLengthResult(null);
-      setRemainingRerolls(rerolls);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, rerolls]);
+  }, [savedState, rerolls]);
+
+  // Save state whenever it changes (using ref to avoid infinite loop)
+  const onStateChangeRef = useRef(onStateChange);
+  useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
+
+  useEffect(() => {
+    if (initialRoll && onStateChangeRef.current) {
+      const stateToSave = {
+        ageCalculationState: {
+          ageResult,
+          kroppsbyggnadResult,
+          lengthResult,
+          remainingRerolls
+        }
+      };
+      onStateChangeRef.current(stateToSave);
+    }
+  }, [ageResult, kroppsbyggnadResult, lengthResult, remainingRerolls, initialRoll]);
   
   // Recalculate apparent age when raceCategory loads (if age was already calculated)
+  // Track the last calculated combination to avoid infinite loops
+  const lastCalculatedRef = useRef({ raceCategoryId: null, age: null });
   useEffect(() => {
-    if (open && ageResult && raceCategory && (raceCategory.apparentAgeFormula || (raceCategory.apparentAgeTable && raceCategory.apparentAgeTable.length > 0))) {
-      const apparentAge = calculateApparentAge(ageResult.age, raceCategory);
-      setAgeResult(prev => ({
-        ...prev,
-        apparentAge
-      }));
+    if (ageResult?.age && raceCategory && 
+        (raceCategory.apparentAgeFormula || (raceCategory.apparentAgeTable && raceCategory.apparentAgeTable.length > 0))) {
+      const raceCategoryId = raceCategory._id || raceCategory.id;
+      const currentAge = ageResult.age;
+      
+      // Only recalculate if this is a different raceCategory or age than last time
+      if (lastCalculatedRef.current.raceCategoryId !== raceCategoryId || 
+          lastCalculatedRef.current.age !== currentAge) {
+        const apparentAge = calculateApparentAge(currentAge, raceCategory);
+        // Only update if apparent age is different from current
+        if (ageResult.apparentAge !== apparentAge) {
+          setAgeResult(prev => ({
+            ...prev,
+            apparentAge
+          }));
+        }
+        lastCalculatedRef.current = { raceCategoryId, age: currentAge };
+      }
     }
+    // We intentionally don't include ageResult.apparentAge to avoid infinite loops
+    // We only recalculate when raceCategory or age changes, not when apparentAge changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raceCategory, open]);
+  }, [raceCategory, ageResult?.age]);
 
   // Calculate length after kroppsbyggnad is set (since weight depends on kroppsbyggnad type)
   // Note: handleRollKroppsbyggnad now calls handleRollLength directly with shared dice,
   // so this useEffect is mainly for when varierandeVikt, selectedRace, or gender changes
   useEffect(() => {
-    if (open && kroppsbyggnadResult && initialRoll) {
+    if (kroppsbyggnadResult && initialRoll) {
       // Use the same t6Rolls from kroppsbyggnad to keep them in sync
       handleRollLength(kroppsbyggnadResult.t6Rolls, kroppsbyggnadResult.type);
     }
@@ -350,7 +386,7 @@ export default function AgeCalculationDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+    <>
       <DialogTitle>
         Beräkna ålder, kroppsbyggnad, längd och vikt
         {remainingRerolls > 0 && (
@@ -722,14 +758,15 @@ export default function AgeCalculationDialog({
           Bekräfta
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
 }
 
 AgeCalculationDialog.propTypes = {
-  open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
+  onStateChange: PropTypes.func,
+  savedState: PropTypes.object,
   attributes: PropTypes.object,
   rerolls: PropTypes.number,
   selectedRace: PropTypes.object,

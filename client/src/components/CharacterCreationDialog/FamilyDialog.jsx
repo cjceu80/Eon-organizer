@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -356,9 +355,10 @@ function determineParentStatus(rollResult, table) {
 }
 
 export default function FamilyDialog({
-  open,
   onClose,
   onConfirm,
+  onStateChange = null,
+  savedState = null,
   ageData = null,
   selectedRace = null,
   raceCategory = null,
@@ -493,33 +493,63 @@ export default function FamilyDialog({
     return colors[status] || 'default';
   };
 
-  // Initialize rolling when dialog opens
+  // Load saved state or initialize rolling
   useEffect(() => {
-    if (open && !initialRoll) {
+    if (savedState) {
+      // Restore from saved state
+      if (savedState.siblings) setSiblings(savedState.siblings);
+      if (savedState.olderLittersRoll) setOlderLittersRoll(savedState.olderLittersRoll);
+      if (savedState.youngerLittersRoll) setYoungerLittersRoll(savedState.youngerLittersRoll);
+      if (savedState.olderLitters !== undefined) setOlderLitters(savedState.olderLitters);
+      if (savedState.youngerLitters !== undefined) setYoungerLitters(savedState.youngerLitters);
+      if (savedState.rollResult) setRollResult(savedState.rollResult);
+      if (savedState.parentStatus) setParentStatus(savedState.parentStatus);
+      if (savedState.rollDetails) setRollDetails(savedState.rollDetails);
+      if (savedState.motherAgeResult) setMotherAgeResult(savedState.motherAgeResult);
+      if (savedState.fatherAgeResult) setFatherAgeResult(savedState.fatherAgeResult);
+      if (savedState.remainingRerolls !== undefined) setRemainingRerolls(savedState.remainingRerolls);
+      if (savedState.olderRerollUsed !== undefined) setOlderRerollUsed(savedState.olderRerollUsed);
+      if (savedState.youngerRerollUsed !== undefined) setYoungerRerollUsed(savedState.youngerRerollUsed);
+      if (savedState.parentRerollUsed !== undefined) setParentRerollUsed(savedState.parentRerollUsed);
+      setInitialRoll(true);
+    } else if (!initialRoll) {
+      // No saved state, do initial rolls
       handleRollSiblings();
       handleRollParents();
       setInitialRoll(true);
     }
-    if (!open) {
-      // Reset when dialog closes
-      setInitialRoll(false);
-      setSiblings([]);
-      setOlderLittersRoll(null);
-      setYoungerLittersRoll(null);
-      setOlderLitters(0);
-      setYoungerLitters(0);
-      setRollResult(null);
-      setParentStatus(null);
-      setRollDetails(null);
-      setMotherAgeResult(null);
-      setFatherAgeResult(null);
-      setRemainingRerolls(rerolls);
-      setOlderRerollUsed(false);
-      setYoungerRerollUsed(false);
-      setParentRerollUsed(false);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, rerolls]);
+  }, [savedState, rerolls]);
+
+  // Save state whenever it changes (using ref to avoid infinite loop)
+  const onStateChangeRef = useRef(onStateChange);
+  useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
+
+  useEffect(() => {
+    if (initialRoll && onStateChangeRef.current) {
+      const stateToSave = {
+        familyState: {
+          siblings,
+          olderLittersRoll,
+          youngerLittersRoll,
+          olderLitters,
+          youngerLitters,
+          rollResult,
+          parentStatus,
+          rollDetails,
+          motherAgeResult,
+          fatherAgeResult,
+          remainingRerolls,
+          olderRerollUsed,
+          youngerRerollUsed,
+          parentRerollUsed
+        }
+      };
+      onStateChangeRef.current(stateToSave);
+    }
+  }, [siblings, olderLittersRoll, youngerLittersRoll, olderLitters, youngerLitters, rollResult, parentStatus, rollDetails, motherAgeResult, fatherAgeResult, remainingRerolls, olderRerollUsed, youngerRerollUsed, parentRerollUsed, initialRoll]);
 
   // Helper function to roll and calculate litters (extracted for reuse)
   const rollLittersHelper = (litterFormula, characterAge) => {
@@ -944,7 +974,7 @@ export default function FamilyDialog({
   const parentConfig = getParentFormula();
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth>
+    <>
       <DialogTitle>
         Familj
         {(olderLittersRoll || youngerLittersRoll) && (
@@ -1334,14 +1364,15 @@ export default function FamilyDialog({
           Bekräfta
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
 }
 
 FamilyDialog.propTypes = {
-  open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
+  onStateChange: PropTypes.func,
+  savedState: PropTypes.object,
   ageData: PropTypes.object,
   selectedRace: PropTypes.object,
   raceCategory: PropTypes.object,

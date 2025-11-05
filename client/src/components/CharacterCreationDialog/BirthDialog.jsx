@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -30,9 +29,10 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { rollT100WithDetails, rollT10 } from '../../utils/dice';
 
 export default function BirthDialog({
-  open,
   onClose,
   onConfirm,
+  onStateChange = null,
+  savedState = null,
   worldSettings = {},
   ageData = null
 }) {
@@ -87,26 +87,50 @@ export default function BirthDialog({
       }
     };
 
-    if (open) {
-      loadData();
+    loadData();
+    
+    // Load saved state
+    if (savedState) {
+      if (savedState.primitiveRoll) setPrimitiveRoll(savedState.primitiveRoll);
+      if (savedState.selectedPrimitive !== undefined) setSelectedPrimitive(savedState.selectedPrimitive);
+      if (savedState.primitiveDescription) setPrimitiveDescription(savedState.primitiveDescription);
+      if (savedState.monthRoll) setMonthRoll(savedState.monthRoll);
+      if (savedState.selectedMonth !== undefined) setSelectedMonth(savedState.selectedMonth);
+      if (savedState.dayRoll) setDayRoll(savedState.dayRoll);
+      if (savedState.selectedDay !== undefined) setSelectedDay(savedState.selectedDay);
+      if (savedState.weekRoll) setWeekRoll(savedState.weekRoll);
+      if (savedState.selectedWeek !== undefined) setSelectedWeek(savedState.selectedWeek);
+      if (savedState.usePrimitive !== undefined) setUsePrimitive(savedState.usePrimitive);
+      if (savedState.selectedCalendar) setSelectedCalendar(savedState.selectedCalendar);
     }
-  }, [open]);
-
-  // Reset all selections when dialog opens
+  }, [savedState]);
+  
+  // Save state whenever it changes (using ref to avoid infinite loop)
+  const onStateChangeRef = useRef(onStateChange);
   useEffect(() => {
-    if (open) {
-      setPrimitiveRoll(null);
-      setSelectedPrimitive(null);
-      setPrimitiveDescription('');
-      setMonthRoll(null);
-      setSelectedMonth(null);
-      setDayRoll(null);
-      setSelectedDay(null);
-      setWeekRoll(null);
-      setSelectedWeek(null);
-      setUsePrimitive(false);
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
+
+  useEffect(() => {
+    if (onStateChangeRef.current && backgroundData) {
+      const stateToSave = {
+        birthState: {
+          primitiveRoll,
+          selectedPrimitive,
+          primitiveDescription,
+          monthRoll,
+          selectedMonth,
+          dayRoll,
+          selectedDay,
+          weekRoll,
+          selectedWeek,
+          usePrimitive,
+          selectedCalendar
+        }
+      };
+      onStateChangeRef.current(stateToSave);
     }
-  }, [open]);
+  }, [primitiveRoll, selectedPrimitive, primitiveDescription, monthRoll, selectedMonth, dayRoll, selectedDay, weekRoll, selectedWeek, usePrimitive, selectedCalendar, backgroundData]);
 
   // Update primitive description when selection changes
   useEffect(() => {
@@ -115,9 +139,9 @@ export default function BirthDialog({
     }
   }, [selectedPrimitive]);
 
-  // Auto-roll month when dialog opens
+  // Auto-roll month when dialog opens (if no saved state)
   useEffect(() => {
-    if (open && backgroundData && !monthRoll && !loading) {
+    if (backgroundData && !monthRoll && !loading && !savedState) {
       // Roll month first
       const monthRollResult = rollT100WithDetails();
       setMonthRoll(monthRollResult);
@@ -127,7 +151,7 @@ export default function BirthDialog({
         setSelectedMonth(month);
       }
     }
-  }, [open, backgroundData, monthRoll, loading]);
+  }, [backgroundData, monthRoll, loading, savedState]);
 
   // Auto-roll week after month is rolled
   useEffect(() => {
@@ -315,19 +339,19 @@ export default function BirthDialog({
 
   if (loading) {
     return (
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <>
         <DialogTitle>Födelsedag</DialogTitle>
         <DialogContent>
           <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
             <Typography>Laddar...</Typography>
           </Box>
         </DialogContent>
-      </Dialog>
+      </>
     );
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+    <>
       <DialogTitle>Födelsedag</DialogTitle>
       <DialogContent>
         {/* Content */}
@@ -779,15 +803,7 @@ export default function BirthDialog({
           Bekräfta
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
 }
-
-BirthDialog.propTypes = {
-  open: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  onConfirm: PropTypes.func.isRequired,
-  worldSettings: PropTypes.object,
-  ageData: PropTypes.object
-};
 

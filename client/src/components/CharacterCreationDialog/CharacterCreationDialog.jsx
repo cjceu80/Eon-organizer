@@ -80,6 +80,21 @@ export default function CharacterCreationDialog({
     }
   }, [worldId, getStorageKey]);
 
+  // Save any state to localStorage (merge with existing data)
+  const saveStateToStorage = useCallback((stateData) => {
+    try {
+      const savedData = loadCharacterCreationData();
+      const updatedData = {
+        ...savedData,
+        ...stateData,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(getStorageKey(), JSON.stringify(updatedData));
+    } catch (err) {
+      console.error('Error saving state to localStorage:', err);
+    }
+  }, [getStorageKey, loadCharacterCreationData]);
+
   // Clear character creation data from localStorage
   const clearCharacterCreationData = useCallback(() => {
     try {
@@ -117,15 +132,53 @@ export default function CharacterCreationDialog({
     }
   };
 
-  // Initialize when dialog opens
+  // Initialize when dialog opens - restore state from localStorage
   useEffect(() => {
     if (open) {
-      // Check if we should resume from saved data
       const savedData = loadCharacterCreationData();
-      if (savedData && savedData.race) {
-        // Resume logic - could be enhanced to show resume dialog
-        setShowRaceSelectionDialog(true);
+      if (savedData) {
+        // Restore race selection
+        if (savedData.race) {
+          // Race is stored as { id, name, category } - we'd need to fetch full race object
+          // For now, just set the show dialog state
+        }
+        // Restore character name and bio
+        if (savedData.name) setCharacterName(savedData.name);
+        if (savedData.bio) setCharacterBio(savedData.bio);
+        // Restore stats
+        if (savedData.stats) setRolledStats(savedData.stats);
+        // Restore age data
+        if (savedData.ageData) setAgeData(savedData.ageData);
+        // Restore characteristics
+        if (savedData.characteristics) setCharacteristicsData(savedData.characteristics);
+        // Restore background
+        if (savedData.background) setBackgroundData(savedData.background);
+        
+        // Determine which dialog to show based on what data exists
+        if (savedData.background && savedData.siblings) {
+          // We have family data, show create character dialog
+          setShowCreateCharacterDialog(true);
+        } else if (savedData.background) {
+          // We have background, show family dialog
+          setShowFamilyDialog(true);
+        } else if (savedData.characteristics) {
+          // We have characteristics, show birth dialog
+          setShowBirthDialog(true);
+        } else if (savedData.ageData) {
+          // We have age data, show characteristics dialog
+          setShowCharacteristicsDialog(true);
+        } else if (savedData.stats) {
+          // We have stats, show age calculation dialog
+          setShowAgeCalculationDialog(true);
+        } else if (savedData.race) {
+          // We have race, show stat rolling dialog
+          setShowStatRollingDialog(true);
+        } else {
+          // Start from beginning
+          setShowRaceSelectionDialog(true);
+        }
       } else {
+        // No saved data, start from beginning
         setShowRaceSelectionDialog(true);
       }
     }
@@ -298,98 +351,100 @@ export default function CharacterCreationDialog({
     }
   };
 
+  // Determine which dialog content to show
+  const showDialog = open && (
+    showRaceSelectionDialog || 
+    showStatRollingDialog || 
+    showAgeCalculationDialog || 
+    showCharacteristicsDialog || 
+    showBirthDialog || 
+    showFamilyDialog || 
+    showCreateCharacterDialog
+  );
+
+  const handleDialogClose = () => {
+    // Close the entire character creation dialog
+    onClose();
+  };
+
   return (
-    <>
-      {/* Race Selection Dialog */}
-      <RaceSelectionDialog
-        open={showRaceSelectionDialog && open}
-        onClose={() => {
-          setShowRaceSelectionDialog(false);
-          // If cancelling at race selection, close the entire creation dialog
-          onClose();
-        }}
-        worldId={worldId}
-        onRaceSelected={handleRaceSelected}
-        initialRaceId={selectedRace?.id || selectedRace?._id || (() => {
-          const savedData = loadCharacterCreationData();
-          return savedData?.race?.id || null;
-        })()}
-      />
+    <Dialog open={showDialog} onClose={handleDialogClose} maxWidth="xl" fullWidth>
+      {showRaceSelectionDialog && (
+        <RaceSelectionDialog
+          onClose={handleDialogClose}
+          worldId={worldId}
+          onRaceSelected={handleRaceSelected}
+          initialRaceId={selectedRace?.id || selectedRace?._id || (() => {
+            const savedData = loadCharacterCreationData();
+            return savedData?.race?.id || null;
+          })()}
+        />
+      )}
 
-      <StatRollingDialog
-        open={showStatRollingDialog && open}
-        onClose={() => {
-          setShowStatRollingDialog(false);
-          // Close the entire character creation dialog
-          onClose();
-        }}
-        onConfirm={handleStatsRolled}
-        statRollMethod={world?.settings?.statRollMethod || 'standard'}
-        rerolls={world?.settings?.rerolls || 0}
-        selectedRace={selectedRace}
-        feminineAttributes={world?.settings?.feminineAttributes || false}
-        minAttributes={world?.settings?.minAttributes !== undefined ? world?.settings?.minAttributes : null}
-        maxAttributes={world?.settings?.maxAttributes !== undefined ? world?.settings?.maxAttributes : null}
-      />
+      {showStatRollingDialog && (
+        <StatRollingDialog
+          onClose={handleDialogClose}
+          onConfirm={handleStatsRolled}
+          onStateChange={saveStateToStorage}
+          savedState={loadCharacterCreationData()?.statRollingState || null}
+          statRollMethod={world?.settings?.statRollMethod || 'standard'}
+          rerolls={world?.settings?.rerolls || 0}
+          selectedRace={selectedRace}
+          feminineAttributes={world?.settings?.feminineAttributes || false}
+          minAttributes={world?.settings?.minAttributes !== undefined ? world?.settings?.minAttributes : null}
+          maxAttributes={world?.settings?.maxAttributes !== undefined ? world?.settings?.maxAttributes : null}
+        />
+      )}
 
-      <AgeCalculationDialog
-        open={showAgeCalculationDialog && open}
-        onClose={() => {
-          setShowAgeCalculationDialog(false);
-          // Close the entire character creation dialog
-          onClose();
-        }}
-        onConfirm={handleAgeCalculated}
-        attributes={rolledStats?.attributes}
-        rerolls={world?.settings?.rerolls || 0}
-        selectedRace={selectedRace}
-        raceCategory={raceCategory}
-        gender={rolledStats?.gender || 'man'}
-        varierandeVikt={world?.settings?.varierandeVikt !== undefined ? world?.settings?.varierandeVikt : true}
-      />
+      {showAgeCalculationDialog && (
+        <AgeCalculationDialog
+          onClose={handleDialogClose}
+          onConfirm={handleAgeCalculated}
+          onStateChange={saveStateToStorage}
+          savedState={loadCharacterCreationData()?.ageCalculationState || null}
+          attributes={rolledStats?.attributes}
+          rerolls={world?.settings?.rerolls || 0}
+          selectedRace={selectedRace}
+          raceCategory={raceCategory}
+          gender={rolledStats?.gender || 'man'}
+          varierandeVikt={world?.settings?.varierandeVikt !== undefined ? world?.settings?.varierandeVikt : true}
+        />
+      )}
 
-      <CharacteristicsDialog
-        open={showCharacteristicsDialog && open}
-        onClose={() => {
-          setShowCharacteristicsDialog(false);
-          // Close the entire character creation dialog
-          onClose();
-        }}
-        onConfirm={handleCharacteristicsConfirmed}
-      />
+      {showCharacteristicsDialog && (
+        <CharacteristicsDialog
+          onClose={handleDialogClose}
+          onConfirm={handleCharacteristicsConfirmed}
+          onStateChange={saveStateToStorage}
+          savedState={loadCharacterCreationData()?.characteristicsState || null}
+        />
+      )}
 
-      <BirthDialog
-        open={showBirthDialog && open}
-        onClose={() => {
-          setShowBirthDialog(false);
-          // Close the entire character creation dialog
-          onClose();
-        }}
-        onConfirm={handleBackgroundConfirmed}
-        worldSettings={world?.settings || {}}
-        ageData={ageData}
-      />
+      {showBirthDialog && (
+        <BirthDialog
+          onClose={handleDialogClose}
+          onConfirm={handleBackgroundConfirmed}
+          onStateChange={saveStateToStorage}
+          savedState={loadCharacterCreationData()?.birthState || null}
+          worldSettings={world?.settings || {}}
+          ageData={ageData}
+        />
+      )}
 
-      <FamilyDialog
-        open={showFamilyDialog && open}
-        onClose={() => {
-          setShowFamilyDialog(false);
-          // Close the entire character creation dialog
-          onClose();
-        }}
-        onConfirm={handleFamilyConfirmed}
-        ageData={ageData}
-        selectedRace={selectedRace}
-        raceCategory={raceCategory}
-        rerolls={world?.settings?.rerolls || 0}
-      />
+      {showFamilyDialog && (
+        <FamilyDialog
+          onClose={handleDialogClose}
+          onConfirm={handleFamilyConfirmed}
+          onStateChange={saveStateToStorage}
+          savedState={loadCharacterCreationData()?.familyState || null}
+          ageData={ageData}
+          selectedRace={selectedRace}
+          raceCategory={raceCategory}
+          rerolls={world?.settings?.rerolls || 0}
+        />
+      )}
 
-      {/* Create Character Dialog */}
-      <Dialog open={showCreateCharacterDialog && open} onClose={() => {
-        setShowCreateCharacterDialog(false);
-        // Close the entire character creation dialog
-        onClose();
-      }} maxWidth="sm" fullWidth>
+      {showCreateCharacterDialog && (
         <form onSubmit={handleCreateCharacter}>
           <DialogTitle>Skapa karaktär</DialogTitle>
           <DialogContent>
@@ -438,8 +493,7 @@ export default function CharacterCreationDialog({
             <Button onClick={() => {
               setShowCreateCharacterDialog(false);
               clearCharacterCreationData();
-              // Close the entire character creation dialog
-              onClose();
+              handleDialogClose();
             }} disabled={creating}>
               Avbryt och radera
             </Button>
@@ -448,8 +502,8 @@ export default function CharacterCreationDialog({
             </Button>
           </DialogActions>
         </form>
-      </Dialog>
-    </>
+      )}
+    </Dialog>
   );
 }
 

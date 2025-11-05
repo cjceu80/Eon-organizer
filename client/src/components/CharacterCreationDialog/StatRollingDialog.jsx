@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -33,9 +32,10 @@ import {
 } from '../../utils/dice';
 
 export default function StatRollingDialog({ 
-  open, 
   onClose, 
-  onConfirm, 
+  onConfirm,
+  onStateChange = null,
+  savedState = null,
   statRollMethod = 'standard',
   rerolls = 0,
   selectedRace = null,
@@ -61,33 +61,49 @@ export default function StatRollingDialog({
     BIL: 0
   });
 
-  // Initialize rolling when dialog opens
+  // Load saved state or initialize rolling
   useEffect(() => {
-    if (open && !initialRoll) {
+    if (savedState) {
+      // Restore from saved state
+      if (savedState.statsResult) setStatsResult(savedState.statsResult);
+      if (savedState.selectedAttributes) setSelectedAttributes(savedState.selectedAttributes);
+      if (savedState.remainingRerolls !== undefined) setRemainingRerolls(savedState.remainingRerolls);
+      if (savedState.freeRerollAllCount !== undefined) setFreeRerollAllCount(savedState.freeRerollAllCount);
+      if (savedState.gender) setGender(savedState.gender);
+      if (savedState.styDecrease !== undefined) setStyDecrease(savedState.styDecrease);
+      if (savedState.femaleAttributeModifications) setFemaleAttributeModifications(savedState.femaleAttributeModifications);
+      setInitialRoll(true);
+    } else if (!initialRoll) {
+      // No saved state, do initial roll
       setRemainingRerolls(rerolls);
       handleInitialRoll();
       setInitialRoll(true);
     }
-    if (!open) {
-      // Reset when dialog closes
-      setInitialRoll(false);
-      setStatsResult(null);
-      setSelectedAttributes({});
-      setRemainingRerolls(rerolls);
-      setFreeRerollAllCount(0);
-      setGender('man');
-      setStyDecrease(0);
-      setFemaleAttributeModifications({
-        TÅL: 0,
-        RÖR: 0,
-        PER: 0,
-        PSY: 0,
-        VIL: 0,
-        BIL: 0
-      });
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, rerolls]);
+  }, [savedState, rerolls]);
+
+  // Save state whenever it changes (using ref to avoid infinite loop)
+  const onStateChangeRef = useRef(onStateChange);
+  useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
+
+  useEffect(() => {
+    if (initialRoll && onStateChangeRef.current) {
+      const stateToSave = {
+        statRollingState: {
+          statsResult,
+          selectedAttributes,
+          remainingRerolls,
+          freeRerollAllCount,
+          gender,
+          styDecrease,
+          femaleAttributeModifications
+        }
+      };
+      onStateChangeRef.current(stateToSave);
+    }
+  }, [statsResult, selectedAttributes, remainingRerolls, freeRerollAllCount, gender, styDecrease, femaleAttributeModifications, initialRoll]);
 
   // Apply min/max constraints to rolled values
   const applyAttributeConstraints = (attributes) => {
@@ -461,7 +477,7 @@ export default function StatRollingDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <>
       <DialogTitle>
         Slå attribut
         <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -893,14 +909,15 @@ export default function StatRollingDialog({
           Bekräfta
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
 }
 
 StatRollingDialog.propTypes = {
-  open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
+  onStateChange: PropTypes.func,
+  savedState: PropTypes.object,
   statRollMethod: PropTypes.string,
   rerolls: PropTypes.number,
   selectedRace: PropTypes.object,

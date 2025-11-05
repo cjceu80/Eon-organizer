@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -24,7 +23,7 @@ import { useAuth } from '../../hooks/useAuth';
 
 import { EON_ATTRIBUTES } from '../../utils/dice';
 
-export default function RaceSelectionDialog({ open, onClose, worldId, onRaceSelected, initialRaceId = null }) {
+export default function RaceSelectionDialog({ onClose, worldId, onRaceSelected, initialRaceId = null }) {
   const { token } = useAuth();
   const [races, setRaces] = useState([]);
   const [categoryList, setCategoryList] = useState([]);
@@ -111,7 +110,7 @@ export default function RaceSelectionDialog({ open, onClose, worldId, onRaceSele
   }, [token, worldId]);
 
   useEffect(() => {
-    if (open && worldId) {
+    if (worldId) {
       fetchRacesAndCategories();
       // Reset selection when dialog opens (unless we have an initial race)
       if (!initialRaceId) {
@@ -119,7 +118,7 @@ export default function RaceSelectionDialog({ open, onClose, worldId, onRaceSele
         setSelectedCategory(null);
       }
     }
-  }, [open, worldId, initialRaceId, fetchRacesAndCategories]);
+  }, [worldId, initialRaceId, fetchRacesAndCategories]);
 
   // Pre-select race if initialRaceId is provided
   useEffect(() => {
@@ -299,7 +298,7 @@ export default function RaceSelectionDialog({ open, onClose, worldId, onRaceSele
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+    <>
       <DialogTitle>Välj ras</DialogTitle>
       <DialogContent>
         {loading ? (
@@ -407,12 +406,11 @@ export default function RaceSelectionDialog({ open, onClose, worldId, onRaceSele
           Välj ras
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
 }
 
 RaceSelectionDialog.propTypes = {
-  open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   worldId: PropTypes.string.isRequired,
   onRaceSelected: PropTypes.func.isRequired,

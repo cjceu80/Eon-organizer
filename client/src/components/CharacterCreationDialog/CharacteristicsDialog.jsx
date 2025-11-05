@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -37,9 +36,10 @@ const CHARACTERISTICS = [
 ];
 
 export default function CharacteristicsDialog({
-  open,
   onClose,
-  onConfirm
+  onConfirm,
+  onStateChange = null,
+  savedState = null
 }) {
   const [characteristics, setCharacteristics] = useState({});
   const [specializations, setSpecializations] = useState({});
@@ -76,8 +76,12 @@ export default function CharacteristicsDialog({
       }
     };
 
-    if (open) {
-      loadData();
+    loadData();
+    // Load saved state or initialize characteristics
+    if (savedState) {
+      if (savedState.characteristics) setCharacteristics(savedState.characteristics);
+      if (savedState.specializations) setSpecializations(savedState.specializations);
+    } else {
       // Initialize characteristics with fixed values and default non-fixed to 11
       const initial = {};
       CHARACTERISTICS.forEach(char => {
@@ -90,7 +94,25 @@ export default function CharacteristicsDialog({
       setCharacteristics(initial);
       setSpecializations({});
     }
-  }, [open]);
+  }, [savedState]);
+
+  // Save state whenever it changes (using ref to avoid infinite loop)
+  const onStateChangeRef = useRef(onStateChange);
+  useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
+
+  useEffect(() => {
+    if (onStateChangeRef.current && characteristicsData) {
+      const stateToSave = {
+        characteristicsState: {
+          characteristics,
+          specializations
+        }
+      };
+      onStateChangeRef.current(stateToSave);
+    }
+  }, [characteristics, specializations, characteristicsData]);
 
   const handleRoll = (characteristicKey) => {
     const rolls = rollT6Multiple(3);
@@ -173,19 +195,19 @@ export default function CharacteristicsDialog({
 
   if (loading) {
     return (
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <>
         <DialogTitle>Karaktärsdrag</DialogTitle>
         <DialogContent>
           <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
             <Typography>Laddar...</Typography>
           </Box>
         </DialogContent>
-      </Dialog>
+      </>
     );
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+    <>
       <DialogTitle>Karaktärsdrag</DialogTitle>
       <DialogContent>
         <Alert severity="info" sx={{ mb: 3 }}>
@@ -362,13 +384,14 @@ export default function CharacteristicsDialog({
           Bekräfta
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
 }
 
 CharacteristicsDialog.propTypes = {
-  open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  onConfirm: PropTypes.func.isRequired
+  onConfirm: PropTypes.func.isRequired,
+  onStateChange: PropTypes.func,
+  savedState: PropTypes.object
 };
 
