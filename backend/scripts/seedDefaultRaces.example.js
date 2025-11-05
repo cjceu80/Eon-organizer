@@ -113,7 +113,12 @@ const defaultRaces = {
         // Optional: Parent age formula specific to this race
         // Default is 'oldestSiblingOrCharacterApparentAge + 14 + Ob2T6'
         // Example: Some races might have different parent age calculation
-        // ['parentAgeFormula', 'oldestSiblingOrCharacterApparentAge + 20 + Ob3T6']
+        // ['parentAgeFormula', 'oldestSiblingOrCharacterApparentAge + 20 + Ob3T6'],
+        // Optional: Characteristics recommendations for this race
+        // High characteristics default to 13, low characteristics default to 8
+        // Can use full characteristic names or just first 3 characters
+        ['highCharacteristics', ['Lojalitet', 'Heder', 'Tro']], // Example: These tend to be high
+        ['lowCharacteristics', ['Agg', 'Gen']] // Example: Aggression and Generositet tend to be low (using first 3 chars)
       ])
     }
     // Add more EON races here as needed

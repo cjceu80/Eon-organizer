@@ -989,9 +989,9 @@ export default function FamilyDialog({
         )}
       </DialogTitle>
       <DialogContent sx={{ minWidth: 0, overflow: 'visible' }}>
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'column', md: 'row' }, gap: 3 }}>
           {/* Siblings Column - Left */}
-          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 50%' }, minWidth: 0 }}>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 100%', md: '1 1 50%' }, minWidth: 0 }}>
             <Typography variant="h6" gutterBottom>
               Syskon
             </Typography>
@@ -1167,7 +1167,7 @@ export default function FamilyDialog({
             )}
           </Box>
           {/* Parents Column - Right */}
-          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 50%' }, minWidth: 0 }}>
+          <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 100%', md: '1 1 50%' }, minWidth: 0 }}>
             <Typography variant="h6" gutterBottom>
               Föräldrar
             </Typography>

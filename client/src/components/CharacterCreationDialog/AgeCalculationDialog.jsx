@@ -402,7 +402,7 @@ export default function AgeCalculationDialog({
 
         <Grid container spacing={3}>
           {/* Left column: Age */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ sm: 12, md: 6 }}>
             <Box sx={{ mb: 3 }}>
               <Typography variant="h6" gutterBottom>
                 Ålder
@@ -524,7 +524,7 @@ export default function AgeCalculationDialog({
           </Grid>
 
           {/* Right column: Kroppsbyggnad */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Box sx={{ mb: 3 }}>
               <Typography variant="h6" gutterBottom>
                 Kroppsbyggnad
@@ -652,7 +652,7 @@ export default function AgeCalculationDialog({
           </Grid>
 
           {/* Length and Weight Section */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Box sx={{ mb: 3 }}>
               <Typography variant="h6" gutterBottom>
                 Längd och vikt

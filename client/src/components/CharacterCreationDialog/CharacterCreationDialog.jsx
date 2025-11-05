@@ -8,7 +8,8 @@ import {
   Button,
   TextField,
   Box,
-  Typography
+  Typography,
+  Alert
 } from '@mui/material';
 import RaceSelectionDialog from './RaceSelectionDialog';
 import StatRollingDialog from './StatRollingDialog';
@@ -44,6 +45,7 @@ export default function CharacterCreationDialog({
   // They're extracted from familyResult when needed
   const [raceCategory, setRaceCategory] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [showContinueDialog, setShowContinueDialog] = useState(false);
 
   // localStorage key for this world
   const getStorageKey = useCallback(() => `characterCreation_${worldId}`, [worldId]);
@@ -132,51 +134,82 @@ export default function CharacterCreationDialog({
     }
   };
 
-  // Initialize when dialog opens - restore state from localStorage
+  // Fetch full race object from stored race data
+  const fetchRaceFromSavedData = async (savedRaceData) => {
+    if (!savedRaceData || !savedRaceData.id || !worldId || !token) return null;
+    
+    try {
+      const response = await fetch(`/api/races/world/${worldId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const race = data.races?.find(r => (r.id || r._id) === savedRaceData.id);
+        return race || null;
+      }
+    } catch (err) {
+      console.error('Error fetching race:', err);
+    }
+    return null;
+  };
+
+  // Restore state from localStorage
+  const restoreStateFromStorage = async (savedData) => {
+    // Restore race selection
+    if (savedData.race) {
+      const fullRace = await fetchRaceFromSavedData(savedData.race);
+      if (fullRace) {
+        setSelectedRace(fullRace);
+        await fetchRaceCategory(fullRace);
+      }
+    }
+    // Restore character name and bio
+    if (savedData.name) setCharacterName(savedData.name);
+    if (savedData.bio) setCharacterBio(savedData.bio);
+    // Restore stats
+    if (savedData.stats) setRolledStats(savedData.stats);
+    // Restore age data
+    if (savedData.ageData) setAgeData(savedData.ageData);
+    // Restore characteristics
+    if (savedData.characteristics) setCharacteristicsData(savedData.characteristics);
+    // Restore background
+    if (savedData.background) setBackgroundData(savedData.background);
+    
+    // Determine which dialog to show based on what data exists
+    if (savedData.background && savedData.siblings) {
+      // We have family data, show create character dialog
+      setShowCreateCharacterDialog(true);
+    } else if (savedData.background) {
+      // We have background, show family dialog
+      setShowFamilyDialog(true);
+    } else if (savedData.characteristics) {
+      // We have characteristics, show birth dialog
+      setShowBirthDialog(true);
+    } else if (savedData.ageData) {
+      // We have age data, show characteristics dialog
+      setShowCharacteristicsDialog(true);
+    } else if (savedData.stats) {
+      // We have stats, show age calculation dialog
+      setShowAgeCalculationDialog(true);
+    } else if (savedData.race) {
+      // We have race, show stat rolling dialog
+      setShowStatRollingDialog(true);
+    } else {
+      // Start from beginning
+      setShowRaceSelectionDialog(true);
+    }
+  };
+
+  // Initialize when dialog opens - check for saved data
   useEffect(() => {
     if (open) {
       const savedData = loadCharacterCreationData();
-      if (savedData) {
-        // Restore race selection
-        if (savedData.race) {
-          // Race is stored as { id, name, category } - we'd need to fetch full race object
-          // For now, just set the show dialog state
-        }
-        // Restore character name and bio
-        if (savedData.name) setCharacterName(savedData.name);
-        if (savedData.bio) setCharacterBio(savedData.bio);
-        // Restore stats
-        if (savedData.stats) setRolledStats(savedData.stats);
-        // Restore age data
-        if (savedData.ageData) setAgeData(savedData.ageData);
-        // Restore characteristics
-        if (savedData.characteristics) setCharacteristicsData(savedData.characteristics);
-        // Restore background
-        if (savedData.background) setBackgroundData(savedData.background);
-        
-        // Determine which dialog to show based on what data exists
-        if (savedData.background && savedData.siblings) {
-          // We have family data, show create character dialog
-          setShowCreateCharacterDialog(true);
-        } else if (savedData.background) {
-          // We have background, show family dialog
-          setShowFamilyDialog(true);
-        } else if (savedData.characteristics) {
-          // We have characteristics, show birth dialog
-          setShowBirthDialog(true);
-        } else if (savedData.ageData) {
-          // We have age data, show characteristics dialog
-          setShowCharacteristicsDialog(true);
-        } else if (savedData.stats) {
-          // We have stats, show age calculation dialog
-          setShowAgeCalculationDialog(true);
-        } else if (savedData.race) {
-          // We have race, show stat rolling dialog
-          setShowStatRollingDialog(true);
-        } else {
-          // Start from beginning
-          setShowRaceSelectionDialog(true);
-        }
+      if (savedData && Object.keys(savedData).length > 0 && savedData.timestamp) {
+        // Show continue dialog
+        setShowContinueDialog(true);
       } else {
         // No saved data, start from beginning
         setShowRaceSelectionDialog(true);
@@ -184,7 +217,33 @@ export default function CharacterCreationDialog({
     }
   }, [open, loadCharacterCreationData]);
 
-  // Reset all state when dialog closes
+  // Handle continue from saved data
+  const handleContinue = async () => {
+    setShowContinueDialog(false);
+    const savedData = loadCharacterCreationData();
+    if (savedData) {
+      await restoreStateFromStorage(savedData);
+    }
+  };
+
+  // Handle abandon saved data
+  const handleAbandon = () => {
+    setShowContinueDialog(false);
+    clearCharacterCreationData();
+    // Reset all state
+    setSelectedRace(null);
+    setCharacterName('');
+    setCharacterBio('');
+    setRolledStats(null);
+    setCharacteristicsData(null);
+    setBackgroundData(null);
+    setAgeData(null);
+    setRaceCategory(null);
+    // Start from beginning
+    setShowRaceSelectionDialog(true);
+  };
+
+  // Reset all state when dialog closes (but keep localStorage)
   useEffect(() => {
     if (!open) {
       // Reset all dialog states
@@ -195,8 +254,9 @@ export default function CharacterCreationDialog({
       setShowBirthDialog(false);
       setShowFamilyDialog(false);
       setShowCreateCharacterDialog(false);
+      setShowContinueDialog(false);
       
-      // Reset all data states
+      // Reset all data states (but don't clear localStorage - it persists)
       setSelectedRace(null);
       setCharacterName('');
       setCharacterBio('');
@@ -206,11 +266,8 @@ export default function CharacterCreationDialog({
       setAgeData(null);
       setRaceCategory(null);
       setCreating(false);
-      
-      // Clear localStorage when closing
-      clearCharacterCreationData();
     }
-  }, [open, clearCharacterCreationData]);
+  }, [open]);
   
 
   const handleRaceSelected = async (race) => {
@@ -364,11 +421,34 @@ export default function CharacterCreationDialog({
 
   const handleDialogClose = () => {
     // Close the entire character creation dialog
+    // Note: localStorage is NOT cleared here - it persists for next time
     onClose();
   };
 
   return (
-    <Dialog open={showDialog} onClose={handleDialogClose} maxWidth="xl" fullWidth>
+    <>
+      {/* Continue/Abandon Dialog */}
+      <Dialog open={showContinueDialog && open} onClose={() => setShowContinueDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Fortsätt skapande?</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Det finns sparad data från tidigare försök att skapa en karaktär. Vill du fortsätta där du slutade eller börja om?
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            Om du väljer att börja om kommer all sparad data att raderas.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleAbandon} color="error">
+            Börja om
+          </Button>
+          <Button onClick={handleContinue} variant="contained">
+            Fortsätt
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showDialog && !showContinueDialog} onClose={handleDialogClose} maxWidth="xl" fullWidth>
       {showRaceSelectionDialog && (
         <RaceSelectionDialog
           onClose={handleDialogClose}
@@ -417,6 +497,7 @@ export default function CharacterCreationDialog({
           onConfirm={handleCharacteristicsConfirmed}
           onStateChange={saveStateToStorage}
           savedState={loadCharacterCreationData()?.characteristicsState || null}
+          selectedRace={selectedRace}
         />
       )}
 
@@ -470,7 +551,12 @@ export default function CharacterCreationDialog({
               fullWidth
               variant="outlined"
               value={characterName}
-              onChange={(e) => setCharacterName(e.target.value)}
+              onChange={(e) => {
+                const newName = e.target.value;
+                setCharacterName(newName);
+                // Save name to localStorage
+                saveStateToStorage({ name: newName });
+              }}
               disabled={creating}
               required
               sx={{ mb: 2 }}
@@ -485,7 +571,12 @@ export default function CharacterCreationDialog({
               multiline
               rows={4}
               value={characterBio}
-              onChange={(e) => setCharacterBio(e.target.value)}
+              onChange={(e) => {
+                const newBio = e.target.value;
+                setCharacterBio(newBio);
+                // Save bio to localStorage
+                saveStateToStorage({ bio: newBio });
+              }}
               disabled={creating}
             />
           </DialogContent>
@@ -494,7 +585,7 @@ export default function CharacterCreationDialog({
               setShowCreateCharacterDialog(false);
               clearCharacterCreationData();
               handleDialogClose();
-            }} disabled={creating}>
+            }} disabled={creating} color="error">
               Avbryt och radera
             </Button>
             <Button type="submit" variant="contained" disabled={creating || !characterName.trim() || !selectedRace}>
@@ -504,6 +595,7 @@ export default function CharacterCreationDialog({
         </form>
       )}
     </Dialog>
+    </>
   );
 }
 

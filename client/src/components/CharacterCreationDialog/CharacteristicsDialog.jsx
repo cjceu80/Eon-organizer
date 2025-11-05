@@ -14,15 +14,11 @@ import {
   TableHead,
   TableRow,
   Paper,
-  IconButton,
-  Tooltip,
-  TextField,
   Alert,
-  Grid,
-  Chip
+  Grid
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import { rollT6Multiple } from '../../utils/dice';
+import CharacteristicsDialogItem from './CharacteristicsDialogItem';
 
 const CHARACTERISTICS = [
   { key: 'Lojalitet', fixed: false },
@@ -35,11 +31,19 @@ const CHARACTERISTICS = [
   { key: 'Tur', fixed: true, value: 11 }
 ];
 
+// Helper to match characteristic by full name or first 3 characters
+const matchesCharacteristic = (charKey, recommendation) => {
+  const charLower = charKey.toLowerCase();
+  const recLower = recommendation.toLowerCase();
+  return charLower === recLower || charLower.substring(0, 3) === recLower.substring(0, 3);
+};
+
 export default function CharacteristicsDialog({
   onClose,
   onConfirm,
   onStateChange = null,
-  savedState = null
+  savedState = null,
+  selectedRace = null
 }) {
   const [characteristics, setCharacteristics] = useState({});
   const [specializations, setSpecializations] = useState({});
@@ -77,24 +81,45 @@ export default function CharacteristicsDialog({
     };
 
     loadData();
+  }, [savedState, selectedRace]);
+
+  // Initialize characteristics on mount or when selectedRace changes
+  useEffect(() => {
     // Load saved state or initialize characteristics
-    if (savedState) {
-      if (savedState.characteristics) setCharacteristics(savedState.characteristics);
-      if (savedState.specializations) setSpecializations(savedState.specializations);
-    } else {
+    if (savedState?.characteristicsState) {
+      if (savedState.characteristicsState.characteristics) setCharacteristics(savedState.characteristicsState.characteristics);
+      if (savedState.characteristicsState.specializations) setSpecializations(savedState.characteristicsState.specializations);
+    } else if (!characteristics || Object.keys(characteristics).length === 0) {
+      // Only initialize if characteristics is empty
+      // Get race recommendations if available
+      const highCharacteristics = selectedRace?.metadata?.highCharacteristics || [];
+      const lowCharacteristics = selectedRace?.metadata?.lowCharacteristics || [];
+      
       // Initialize characteristics with fixed values and default non-fixed to 11
+      // But apply race recommendations: 13 for high, 8 for low
       const initial = {};
       CHARACTERISTICS.forEach(char => {
         if (char.fixed) {
           initial[char.key] = char.value;
         } else {
-          initial[char.key] = 11;
+          // Check if this characteristic is recommended as high or low
+          const isHigh = highCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+          const isLow = lowCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+          
+          if (isHigh) {
+            initial[char.key] = 13;
+          } else if (isLow) {
+            initial[char.key] = 8;
+          } else {
+            initial[char.key] = 11;
+          }
         }
       });
       setCharacteristics(initial);
       setSpecializations({});
     }
-  }, [savedState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedState, selectedRace]);
 
   // Save state whenever it changes (using ref to avoid infinite loop)
   const onStateChangeRef = useRef(onStateChange);
@@ -159,11 +184,15 @@ export default function CharacteristicsDialog({
   };
 
   const hasHighSpecialization = (characteristicKey) => {
+    const char = CHARACTERISTICS.find(c => c.key === characteristicKey);
+    if (char?.fixed) return false; // Fixed characteristics don't have specializations
     const value = getValue(characteristicKey);
     return typeof value === 'number' && value >= 14;
   };
 
   const hasLowSpecialization = (characteristicKey) => {
+    const char = CHARACTERISTICS.find(c => c.key === characteristicKey);
+    if (char?.fixed) return false; // Fixed characteristics don't have specializations
     const value = getValue(characteristicKey);
     return typeof value === 'number' && value <= 7;
   };
@@ -212,23 +241,26 @@ export default function CharacteristicsDialog({
       <DialogContent>
         <Alert severity="info" sx={{ mb: 3 }}>
           Rykte är satt till 5 och Tur är satt till 11. Du kan slå de andra värdena med 3T6 (3-18) eller ange dem manuellt. 
-          Vid värde ≥14 kan du ange en hög specialisering och vid värde ≤7 kan du ange en låg specialisering.
+          Vid värde ≥14 kan du ange en hög specialisering och vid värde ≤7 kan du ange en låg specialisering. Klicka på ett exempel för att fylla i textfältet.
         </Alert>
 
         <Grid container spacing={3}>
-          {/* Left column: Characteristics table */}
-          <Grid item xs={12} md={7}>
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Karaktärsdrag</strong></TableCell>
-                    <TableCell align="right"><strong>Värde</strong></TableCell>
-                    <TableCell align="center"><strong>Åtgärder</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {CHARACTERISTICS.map(char => {
+          {/* Left column: Characteristics in two columns */}
+          <Grid size={{ xs: 12, sm: 12 }}>
+            <Grid container spacing={2}>
+              {/* First column of characteristics */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Karaktärsdrag</strong></TableCell>
+                        <TableCell align="right"><strong>Värde</strong></TableCell>
+                        <TableCell align="center"><strong>Åtgärder</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {CHARACTERISTICS.slice(0, Math.ceil(CHARACTERISTICS.length / 2)).map(char => {
                     const value = getValue(char.key);
                     const isFixed = char.fixed;
                     const description = characteristicsData?.descriptions?.[char.key] || '';
@@ -236,145 +268,90 @@ export default function CharacteristicsDialog({
                     const showLowSpec = hasLowSpecialization(char.key);
                     const highExamples = characteristicsData?.highSpecializationExamples?.[char.key] || [];
                     const lowExamples = characteristicsData?.lowSpecializationExamples?.[char.key] || [];
+                    
+                    // Check if this characteristic is recommended as high or low by the race
+                    const highCharacteristics = selectedRace?.metadata?.highCharacteristics || [];
+                    const lowCharacteristics = selectedRace?.metadata?.lowCharacteristics || [];
+                    const isHighRecommended = highCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+                    const isLowRecommended = lowCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
 
                     return (
-                      <TableRow key={char.key}>
-                        <TableCell>
-                          <Box>
-                            <Typography variant="body1" fontWeight="medium">
-                              {char.key}
-                            </Typography>
-                            {description && (
-                              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                {description}
-                              </Typography>
-                            )}
-                            {showHighSpec && highExamples.length > 0 && (
-                              <Box sx={{ mt: 1 }}>
-                                <Typography variant="caption" color="success.main" fontWeight="medium" display="block">
-                                  Hög specialisering exempel:
-                                </Typography>
-                                {highExamples.map((example, idx) => (
-                                  <Typography key={idx} variant="caption" color="text.secondary" display="block" sx={{ ml: 1 }}>
-                                    • {example}
-                                  </Typography>
-                                ))}
-                              </Box>
-                            )}
-                            {showLowSpec && lowExamples.length > 0 && (
-                              <Box sx={{ mt: 1 }}>
-                                <Typography variant="caption" color="error.main" fontWeight="medium" display="block">
-                                  Låg specialisering exempel:
-                                </Typography>
-                                {lowExamples.map((example, idx) => (
-                                  <Typography key={idx} variant="caption" color="text.secondary" display="block" sx={{ ml: 1 }}>
-                                    • {example}
-                                  </Typography>
-                                ))}
-                              </Box>
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell align="right" sx={{ verticalAlign: 'top' }}>
-                          <Box sx={{ pt: 0.5 }}>
-                            {isFixed ? (
-                              <Chip 
-                                label={value} 
-                                color="default" 
-                                variant="outlined"
-                                sx={{ fontWeight: 'bold' }}
-                              />
-                            ) : (
-                              <TextField
-                                type="number"
-                                value={value}
-                                onChange={(e) => handleValueChange(char.key, e.target.value)}
-                                inputProps={{ min: 3, max: 18 }}
-                                size="small"
-                                sx={{ width: 80 }}
-                                error={value !== '' && (value < 3 || value > 18)}
-                              />
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell align="center" sx={{ verticalAlign: 'top' }}>
-                          <Box sx={{ pt: 0.5 }}>
-                            {!isFixed && (
-                              <Tooltip title="Slå 3T6">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleRoll(char.key)}
-                                  color="primary"
-                                >
-                                  <RefreshIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </Box>
-                        </TableCell>
-                      </TableRow>
+                      <CharacteristicsDialogItem
+                        key={char.key}
+                        char={char}
+                        value={value}
+                        isFixed={isFixed}
+                        description={description}
+                        showHighSpec={showHighSpec}
+                        showLowSpec={showLowSpec}
+                        highExamples={highExamples}
+                        lowExamples={lowExamples}
+                        isHighRecommended={isHighRecommended}
+                        isLowRecommended={isLowRecommended}
+                        specializations={specializations}
+                        onValueChange={handleValueChange}
+                        onRoll={handleRoll}
+                        onSpecializationChange={handleSpecializationChange}
+                      />
                     );
                   })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Grid>
-
-          {/* Right column: Specializations */}
-          <Grid item xs={12} md={5}>
-            <Box sx={{ position: 'sticky', top: 0 }}>
-              <Typography variant="h6" gutterBottom>
-                Specialiseringar
-              </Typography>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Ange specialiseringar för karaktärsdrag med värde ≥14 (hög) eller ≤7 (låg).
-              </Alert>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Grid>
               
-              {CHARACTERISTICS.filter(char => !char.fixed).map(char => {
-                const value = getValue(char.key);
-                const showHighSpec = hasHighSpecialization(char.key);
-                const showLowSpec = hasLowSpecialization(char.key);
-                
-                if (!showHighSpec && !showLowSpec) {
-                  return null;
-                }
+              {/* Second column of characteristics */}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Karaktärsdrag</strong></TableCell>
+                        <TableCell align="right"><strong>Värde</strong></TableCell>
+                        <TableCell align="center"><strong>Åtgärder</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {CHARACTERISTICS.slice(Math.ceil(CHARACTERISTICS.length / 2)).map(char => {
+                        const value = getValue(char.key);
+                        const isFixed = char.fixed;
+                        const description = characteristicsData?.descriptions?.[char.key] || '';
+                        const showHighSpec = hasHighSpecialization(char.key);
+                        const showLowSpec = hasLowSpecialization(char.key);
+                        const highExamples = characteristicsData?.highSpecializationExamples?.[char.key] || [];
+                        const lowExamples = characteristicsData?.lowSpecializationExamples?.[char.key] || [];
+                        
+                        // Check if this characteristic is recommended as high or low by the race
+                        const highCharacteristics = selectedRace?.metadata?.highCharacteristics || [];
+                        const lowCharacteristics = selectedRace?.metadata?.lowCharacteristics || [];
+                        const isHighRecommended = highCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+                        const isLowRecommended = lowCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
 
-                return (
-                  <Box key={char.key} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      {char.key} ({value})
-                    </Typography>
-                    {showHighSpec && (
-                      <TextField
-                        fullWidth
-                        label="Hög specialisering"
-                        value={specializations[`${char.key}_high`] || ''}
-                        onChange={(e) => handleSpecializationChange(`${char.key}_high`, e.target.value)}
-                        size="small"
-                        sx={{ mb: 1 }}
-                      />
-                    )}
-                    {showLowSpec && (
-                      <TextField
-                        fullWidth
-                        label="Låg specialisering"
-                        value={specializations[`${char.key}_low`] || ''}
-                        onChange={(e) => handleSpecializationChange(`${char.key}_low`, e.target.value)}
-                        size="small"
-                      />
-                    )}
-                  </Box>
-                );
-              })}
-              
-              {CHARACTERISTICS.filter(char => !char.fixed).every(char => {
-                return !(hasHighSpecialization(char.key) || hasLowSpecialization(char.key));
-              }) && (
-                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                  Inga specialiseringar tillgängliga än. Slå värden ≥14 eller ≤7 för att aktivera specialiseringar.
-                </Typography>
-              )}
-            </Box>
+                        return (
+                          <CharacteristicsDialogItem
+                            key={char.key}
+                            char={char}
+                            value={value}
+                            isFixed={isFixed}
+                            description={description}
+                            showHighSpec={showHighSpec}
+                            showLowSpec={showLowSpec}
+                            highExamples={highExamples}
+                            lowExamples={lowExamples}
+                            isHighRecommended={isHighRecommended}
+                            isLowRecommended={isLowRecommended}
+                            specializations={specializations}
+                            onValueChange={handleValueChange}
+                            onRoll={handleRoll}
+                            onSpecializationChange={handleSpecializationChange}
+                          />
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Grid>
+            </Grid>
           </Grid>
         </Grid>
       </DialogContent>
@@ -392,6 +369,7 @@ CharacteristicsDialog.propTypes = {
   onClose: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
   onStateChange: PropTypes.func,
-  savedState: PropTypes.object
+  savedState: PropTypes.object,
+  selectedRace: PropTypes.object
 };
 

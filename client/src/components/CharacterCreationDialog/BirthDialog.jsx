@@ -354,6 +354,47 @@ export default function BirthDialog({
     <>
       <DialogTitle>Födelsedag</DialogTitle>
       <DialogContent>
+        {/* Birthdate Display */}
+        {((usePrimitive && selectedPrimitive && primitiveDescription) || (!usePrimitive && selectedDay && selectedMonth && selectedWeek)) && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Födelsedatum
+            </Typography>
+            
+            {!usePrimitive && (
+              <Box sx={{ mb: 2 }}>
+                <FormControl fullWidth size="small" sx={{ maxWidth: 300 }}>
+                  <InputLabel>Kalender</InputLabel>
+                  <Select
+                    value={selectedCalendar}
+                    label="Kalender"
+                    onChange={(e) => setSelectedCalendar(e.target.value)}
+                  >
+                    <MenuItem value="Colonisk">Colonisk</MenuItem>
+                    <MenuItem value="Jargisk">Jargisk</MenuItem>
+                    <MenuItem value="Asharisk">Asharisk</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            )}
+
+            {ageData && ageData.age ? (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="body1">
+                  <strong>{calculateBirthdate() || 'Beräknar...'}</strong>
+                </Typography>
+              </Alert>
+            ) : (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  Ålder saknas. Födelsedatum kan inte beräknas.
+                </Typography>
+              </Alert>
+            )}
+            <Divider sx={{ mt: 2, mb: 2 }} />
+          </Box>
+        )}
+
         {/* Content */}
         {backgroundData && (
           <Box>
@@ -368,7 +409,7 @@ export default function BirthDialog({
 
             <Grid container spacing={3}>
               {/* Month */}
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle1" gutterBottom>
                     1. Månad
@@ -455,7 +496,7 @@ export default function BirthDialog({
 
               {/* Week */}
               {monthRoll && (
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="subtitle1" gutterBottom>
                       2. Vecka
@@ -746,47 +787,6 @@ export default function BirthDialog({
           </Box>
         )}
 
-        {/* Birthdate Display */}
-        {((usePrimitive && selectedPrimitive && primitiveDescription) || (!usePrimitive && selectedDay && selectedMonth && selectedWeek)) && (
-          <Box sx={{ mt: 4 }}>
-            <Divider sx={{ mb: 2 }} />
-            <Typography variant="h6" gutterBottom>
-              Födelsedatum
-            </Typography>
-            
-            {!usePrimitive && (
-              <Box sx={{ mb: 2 }}>
-                <FormControl fullWidth size="small" sx={{ maxWidth: 300 }}>
-                  <InputLabel>Kalender</InputLabel>
-                  <Select
-                    value={selectedCalendar}
-                    label="Kalender"
-                    onChange={(e) => setSelectedCalendar(e.target.value)}
-                  >
-                    <MenuItem value="Colonisk">Colonisk</MenuItem>
-                    <MenuItem value="Jargisk">Jargisk</MenuItem>
-                    <MenuItem value="Asharisk">Asharisk</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-            )}
-
-            {ageData && ageData.age ? (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <Typography variant="body1">
-                  <strong>{calculateBirthdate() || 'Beräknar...'}</strong>
-                </Typography>
-              </Alert>
-            ) : (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <Typography variant="body2">
-                  Ålder saknas. Födelsedatum kan inte beräknas.
-                </Typography>
-              </Alert>
-            )}
-          </Box>
-        )}
-
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Avbryt</Button>
@@ -806,4 +806,13 @@ export default function BirthDialog({
     </>
   );
 }
+
+BirthDialog.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+  onStateChange: PropTypes.func,
+  savedState: PropTypes.object,
+  worldSettings: PropTypes.object,
+  ageData: PropTypes.object
+};
 
