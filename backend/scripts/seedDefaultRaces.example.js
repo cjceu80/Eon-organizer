@@ -98,7 +98,7 @@ const defaultRaces = {
         // If not provided, will fall back to race category's siblingFormula, then defaults
         ['siblingFormula', {
           numberOfLitters: 'Ob1T6-2',
-          litterSize: '1T6/2+1', // Example: for triarker with formula-based litter size
+          litterSize: '1T6/2+1', // Example: for Tirarker with formula-based litter size
           olderSiblingAgeFormula: 'characterAge + Ob1T6',
           youngerSiblingAgeFormula: 'characterAge - Ob1T6',
           genderFormula: '0.6' // Example: 60% male, 40% female

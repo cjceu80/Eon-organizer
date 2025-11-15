@@ -16,5 +16,6 @@ client/.env
 
 # Copyrighted/default content that may contain proprietary data
 backend/scripts/seedDefaultRaces.js
+backend/scripts/seedRollTables.js
 !backend/scripts/seedDefaultRaces.example.js
 client/public/copyrighted

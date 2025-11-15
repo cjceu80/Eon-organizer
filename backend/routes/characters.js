@@ -111,7 +111,7 @@ async function enrichCharactersWithApparentAge(characters) {
 
 // Create a new character
 router.post('/', authenticateToken, asyncHandler(async (req, res) => {
-  const { name, worldId, bio, stats, inventory } = req.body;
+  const { name, worldId, bio, stats, inventory, bonuses } = req.body;
 
   // Validation
   if (!name || !name.trim()) {
@@ -172,6 +172,7 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
     owner: req.user.id,
     bio: bio || '',
     stats: stats || {},
+    bonuses: bonuses || {},
     inventory: inventory || [],
     isActive: true
   });

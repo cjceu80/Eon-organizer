@@ -179,7 +179,7 @@ export default function RulesTab({ worldId, world, onWorldUpdate }) {
           disabled={!isAdmin || saving}
           sx={{ mb: 3 }}
           inputProps={{ min: 0 }}
-          helperText="Antal gånger spelare kan rulla om attribut"
+          helperText="Antal gånger spelare slå om tärningskast"
         />
 
         <TextField
@@ -191,7 +191,7 @@ export default function RulesTab({ worldId, world, onWorldUpdate }) {
           disabled={!isAdmin || saving}
           sx={{ mb: 3 }}
           inputProps={{ min: 0 }}
-          helperText="Antal attribut som kan väljas fritt"
+          helperText="Antal fria val i tabeller"
         />
 
         <Box sx={{ mb: 3 }}>

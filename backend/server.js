@@ -9,6 +9,7 @@ import inviteRoutes from './routes/invites.js';
 import raceRoutes from './routes/races.js';
 import raceCategoryRoutes from './routes/raceCategories.js';
 import npcRoutes from './routes/npcs.js';
+import rollTableRoutes from './routes/rollTables.js';
 import { authenticateToken } from './middleware/auth.js';
 
 dotenv.config();
@@ -56,6 +57,7 @@ app.use('/api/invites', inviteRoutes);
 app.use('/api/races', raceRoutes);
 app.use('/api/race-categories', raceCategoryRoutes);
 app.use('/api/npcs', npcRoutes);
+app.use('/api/roll-tables', rollTableRoutes);
 
 // Basic health check route
 app.get('/api/health', (req, res) => {

@@ -29,6 +29,11 @@ const characterSchema = new mongoose.Schema({
     of: mongoose.Schema.Types.Mixed,
     default: {}
   },
+  bonuses: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
   inventory: [{
     item: String,
     quantity: { type: Number, default: 1 },

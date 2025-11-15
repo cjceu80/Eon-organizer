@@ -17,10 +17,14 @@ import {
   TableRow,
   IconButton,
   Tooltip,
-  Chip
+  Chip,
+  CircularProgress
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { rollObT6WithDetails, rollT6Multiple, rollT10, rollT100 } from '../../utils/dice';
+import RollTableCard from '../RollTableCard';
+import RollTableView from '../RollTableView';
+import { useAuth } from '../../hooks/useAuth';
 
 /**
  * Evaluate a formula string with dice notation and math operations
@@ -362,7 +366,8 @@ export default function FamilyDialog({
   ageData = null,
   selectedRace = null,
   raceCategory = null,
-  rerolls = 0
+  rerolls = 0,
+  freeSelections = 0
 }) {
   // Siblings state
   const [siblings, setSiblings] = useState([]);
@@ -382,7 +387,20 @@ export default function FamilyDialog({
   const [fatherAgeResult, setFatherAgeResult] = useState(null);
   
   const [remainingRerolls, setRemainingRerolls] = useState(rerolls);
+  const [remainingFreeSelections, setRemainingFreeSelections] = useState(freeSelections);
   const [initialRoll, setInitialRoll] = useState(false);
+
+  // Roll table state
+  const { token } = useAuth();
+  const [familyTable, setFamilyTable] = useState(null);
+  const [familyTableLoading, setFamilyTableLoading] = useState(false);
+  const [familyTableRollResult, setFamilyTableRollResult] = useState(null);
+  const [showFamilyTableView, setShowFamilyTableView] = useState(false);
+  const [pendingFamilyTableFreeChoice, setPendingFamilyTableFreeChoice] = useState(null);
+  const [familyTableSecondaryRollResult, setFamilyTableSecondaryRollResult] = useState(null);
+  const [showFamilyTableSecondaryView, setShowFamilyTableSecondaryView] = useState(false);
+  const [pendingFamilyTableSecondaryFreeChoice, setPendingFamilyTableSecondaryFreeChoice] = useState(null);
+  const [familyTableFreeRerollUsed, setFamilyTableFreeRerollUsed] = useState(false);
 
   // Get sibling formula from race metadata first, then race category, then defaults
   const getSiblingFormula = () => {
@@ -493,6 +511,35 @@ export default function FamilyDialog({
     return colors[status] || 'default';
   };
 
+  // Fetch family roll table
+  useEffect(() => {
+    const fetchFamilyTable = async () => {
+      if (!token) return;
+      
+      setFamilyTableLoading(true);
+      try {
+        const response = await fetch('/api/roll-tables/rollpersonens-familj', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setFamilyTable(data.table);
+        } else {
+          console.error('Failed to fetch family table');
+        }
+      } catch (error) {
+        console.error('Error fetching family table:', error);
+      } finally {
+        setFamilyTableLoading(false);
+      }
+    };
+
+    fetchFamilyTable();
+  }, [token]);
+
   // Load saved state or initialize rolling
   useEffect(() => {
     if (savedState) {
@@ -508,6 +555,7 @@ export default function FamilyDialog({
       if (savedState.motherAgeResult) setMotherAgeResult(savedState.motherAgeResult);
       if (savedState.fatherAgeResult) setFatherAgeResult(savedState.fatherAgeResult);
       if (savedState.remainingRerolls !== undefined) setRemainingRerolls(savedState.remainingRerolls);
+      if (savedState.remainingFreeSelections !== undefined) setRemainingFreeSelections(savedState.remainingFreeSelections);
       if (savedState.olderRerollUsed !== undefined) setOlderRerollUsed(savedState.olderRerollUsed);
       if (savedState.youngerRerollUsed !== undefined) setYoungerRerollUsed(savedState.youngerRerollUsed);
       if (savedState.parentRerollUsed !== undefined) setParentRerollUsed(savedState.parentRerollUsed);
@@ -542,6 +590,7 @@ export default function FamilyDialog({
           motherAgeResult,
           fatherAgeResult,
           remainingRerolls,
+          remainingFreeSelections,
           olderRerollUsed,
           youngerRerollUsed,
           parentRerollUsed
@@ -549,7 +598,7 @@ export default function FamilyDialog({
       };
       onStateChangeRef.current(stateToSave);
     }
-  }, [siblings, olderLittersRoll, youngerLittersRoll, olderLitters, youngerLitters, rollResult, parentStatus, rollDetails, motherAgeResult, fatherAgeResult, remainingRerolls, olderRerollUsed, youngerRerollUsed, parentRerollUsed, initialRoll]);
+  }, [siblings, olderLittersRoll, youngerLittersRoll, olderLitters, youngerLitters, rollResult, parentStatus, rollDetails, motherAgeResult, fatherAgeResult, remainingRerolls, remainingFreeSelections, olderRerollUsed, youngerRerollUsed, parentRerollUsed, initialRoll]);
 
   // Helper function to roll and calculate litters (extracted for reuse)
   const rollLittersHelper = (litterFormula, characterAge) => {
@@ -957,7 +1006,210 @@ export default function FamilyDialog({
     handleRollParents();
   };
 
+  // Roll table handlers
+  const handleFamilyTableRoll = async (rollResult) => {
+    setFamilyTableRollResult(rollResult);
+    // Process effect if entry has one
+    if (rollResult.entry?.effect) {
+      // TODO: Process effect using effectHandlers
+      console.log('Roll table effect:', rollResult.entry.effect);
+    }
+  };
+
+  const handleFamilyTableReroll = async () => {
+    // Free reroll is only available when 100 was rolled (secondary table is open)
+    // Check if the original roll was 100 by checking if secondary view should be open
+    const was100Roll = familyTableRollResult !== null && 
+                       familyTable && 
+                       familyTable.entries && 
+                       familyTable.entries.length > 0 && 
+                       (() => {
+                         const maxEntry = familyTable.entries.reduce((max, entry) => 
+                           entry.maxValue > max.maxValue ? entry : max
+                         );
+                         return familyTableRollResult.rollValue >= maxEntry.minValue && 
+                                familyTableRollResult.rollValue <= maxEntry.maxValue;
+                       })();
+    
+    const isFreeReroll = !familyTableFreeRerollUsed && 
+                         familyTableRollResult !== null && 
+                         was100Roll;
+    
+    // If not free reroll, check if we have tokens
+    if (!isFreeReroll && remainingRerolls <= 0) return;
+    
+    // Only consume token if not free reroll
+    if (!isFreeReroll) {
+      setRemainingRerolls(prev => prev - 1);
+    }
+    
+    // Mark free reroll as used
+    if (isFreeReroll) {
+      setFamilyTableFreeRerollUsed(true);
+    }
+    
+    // Roll again
+    if (familyTable) {
+      const diceResult = rollDiceForTable(familyTable.dice || '1T100');
+      const entry = findEntryInTable(diceResult.value, familyTable.entries);
+      await handleFamilyTableRoll({
+        rollValue: diceResult.value,
+        entry,
+        diceDetails: diceResult.details
+      });
+      
+      // Check if the new roll triggers a secondary roll
+      if (familyTable.entries && familyTable.entries.length > 0) {
+        const maxEntry = familyTable.entries.reduce((max, entry) => 
+          entry.maxValue > max.maxValue ? entry : max
+        );
+        // If the new roll is the maximum value, open/keep secondary roll view
+        if (diceResult.value >= maxEntry.minValue && diceResult.value <= maxEntry.maxValue) {
+          if (!showFamilyTableSecondaryView) {
+            setShowFamilyTableSecondaryView(true);
+          }
+        }
+        // Note: We don't close the secondary roll view if it's already open, even if the new roll doesn't trigger it
+        // This allows the user to keep the secondary roll result even after rerolling the first roll
+      }
+    }
+  };
+
+
+  const handleFamilyTableUseFreeChoice = (result) => {
+    // Free choice - player selected an entry
+    if (result && result.entry && remainingFreeSelections > 0) {
+      setRemainingFreeSelections(prev => prev - 1);
+      setFamilyTableRollResult(result);
+      // Process effect if entry has one
+      if (result.entry?.effect) {
+        // TODO: Process effect using effectHandlers
+        console.log('Roll table effect:', result.entry.effect);
+      }
+    }
+  };
+
+  const handleFamilyTableSecondaryRoll = () => {
+    // Trigger opening the secondary roll view
+    setShowFamilyTableSecondaryView(true);
+  };
+
+  const handleFamilyTableSecondaryRollResult = async (rollResult) => {
+    setFamilyTableSecondaryRollResult(rollResult);
+    // Process effect if entry has one
+    if (rollResult.entry?.effect) {
+      // TODO: Process effect using effectHandlers
+      console.log('Secondary roll table effect:', rollResult.entry.effect);
+    }
+  };
+
+  const handleFamilyTableSecondaryReroll = async () => {
+    if (remainingRerolls <= 0) return;
+    
+    setRemainingRerolls(prev => prev - 1);
+    
+    // Roll again on secondary table
+    if (familyTable) {
+      const diceResult = rollDiceForTable(familyTable.dice || '1T100');
+      const entry = findEntryInTable(diceResult.value, familyTable.entries);
+      await handleFamilyTableSecondaryRollResult({
+        rollValue: diceResult.value,
+        entry,
+        diceDetails: diceResult.details
+      });
+    }
+  };
+
+  const handleFamilyTableSecondaryUseFreeChoice = (result) => {
+    // Free choice - player selected an entry for secondary roll
+    if (result && result.entry && remainingFreeSelections > 0) {
+      setRemainingFreeSelections(prev => prev - 1);
+      setFamilyTableSecondaryRollResult(result);
+      // Process effect if entry has one
+      if (result.entry?.effect) {
+        // TODO: Process effect using effectHandlers
+        console.log('Secondary roll table effect:', result.entry.effect);
+      }
+    }
+  };
+
+  const rollDiceForTable = (diceString) => {
+    const normalized = diceString.trim().toUpperCase();
+    
+    const t100Match = normalized.match(/^(\d+)T100$/);
+    if (t100Match) {
+      const count = parseInt(t100Match[1], 10);
+      if (count === 1) {
+        const result = rollT100();
+        return { value: result, details: null };
+      } else {
+        let total = 0;
+        for (let i = 0; i < count; i++) {
+          total += rollT100();
+        }
+        return { value: total, details: null };
+      }
+    }
+    
+    const t6Match = normalized.match(/^(\d+)T6$/);
+    if (t6Match) {
+      const count = parseInt(t6Match[1], 10);
+      const rolls = rollT6Multiple(count);
+      return { value: rolls.reduce((a, b) => a + b, 0), details: { rolls } };
+    }
+    
+    const t10Match = normalized.match(/^(\d+)T10$/);
+    if (t10Match) {
+      const count = parseInt(t10Match[1], 10);
+      let total = 0;
+      for (let i = 0; i < count; i++) {
+        total += rollT10();
+      }
+      return { value: total, details: null };
+    }
+    
+    const obT6Match = normalized.match(/^OB(\d+)T6$/);
+    if (obT6Match) {
+      const count = parseInt(obT6Match[1], 10);
+      const result = rollObT6WithDetails(count);
+      return { value: result.total, details: result };
+    }
+    
+    return { value: 0, details: null };
+  };
+
+  const findEntryInTable = (rollValue, entries) => {
+    if (!entries || !Array.isArray(entries)) return null;
+    return entries.find(entry => 
+      rollValue >= entry.minValue && rollValue <= entry.maxValue
+    ) || null;
+  };
+
   const handleConfirm = () => {
+    // Apply pending free choice if there is one for primary roll
+    let finalFamilyTableRoll = familyTableRollResult;
+    if (pendingFamilyTableFreeChoice && remainingFreeSelections > 0) {
+      finalFamilyTableRoll = pendingFamilyTableFreeChoice;
+      setRemainingFreeSelections(prev => prev - 1);
+      // Process effect if entry has one
+      if (pendingFamilyTableFreeChoice.entry?.effect) {
+        // TODO: Process effect using effectHandlers
+        console.log('Roll table effect:', pendingFamilyTableFreeChoice.entry.effect);
+      }
+    }
+    
+    // Apply pending free choice if there is one for secondary roll
+    let finalFamilyTableSecondaryRoll = familyTableSecondaryRollResult;
+    if (pendingFamilyTableSecondaryFreeChoice && remainingFreeSelections > 0) {
+      finalFamilyTableSecondaryRoll = pendingFamilyTableSecondaryFreeChoice;
+      setRemainingFreeSelections(prev => prev - 1);
+      // Process effect if entry has one
+      if (pendingFamilyTableSecondaryFreeChoice.entry?.effect) {
+        // TODO: Process effect using effectHandlers
+        console.log('Secondary roll table effect:', pendingFamilyTableSecondaryFreeChoice.entry.effect);
+      }
+    }
+    
     onConfirm({
       siblings: siblings,
       olderLitters: olderLitters,
@@ -966,7 +1218,9 @@ export default function FamilyDialog({
       parentStatus: parentStatus,
       parentRollResult: rollResult,
       parentFormula: getParentFormula().formula,
-      parentTable: getParentFormula().table
+      parentTable: getParentFormula().table,
+      familyTableRoll: finalFamilyTableRoll,
+      familyTableSecondaryRoll: finalFamilyTableSecondaryRoll
     });
   };
 
@@ -1285,14 +1539,7 @@ export default function FamilyDialog({
                           </Box>
                         </Box>
 
-                        <Box>
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                            Formel:
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {motherAgeResult.formula.replace(/oldestSiblingOrCharacterApparentAge/g, motherAgeResult.baseAge.toString())}
-                          </Typography>
-                        </Box>
+                       
                       </Paper>
                     )}
 
@@ -1327,14 +1574,6 @@ export default function FamilyDialog({
                           </Box>
                         </Box>
 
-                        <Box>
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                            Formel:
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {fatherAgeResult.formula.replace(/oldestSiblingOrCharacterApparentAge/g, fatherAgeResult.baseAge.toString())}
-                          </Typography>
-                        </Box>
                       </Paper>
                     )}
 
@@ -1357,10 +1596,105 @@ export default function FamilyDialog({
             </Box>
           </Box>
         </Box>
+
+        {/* Family Roll Table */}
+        {showFamilyTableView && familyTable ? (
+          <Box sx={{ mt: 3 }}>
+            <RollTableView
+              table={familyTable}
+              rollResult={familyTableRollResult}
+              onRoll={handleFamilyTableRoll}
+              onReroll={handleFamilyTableReroll}
+              onMinimize={() => setShowFamilyTableView(false)}
+              rerolls={remainingRerolls}
+              freeChoiceTokens={remainingFreeSelections}
+              onUseFreeChoice={handleFamilyTableUseFreeChoice}
+              onPendingFreeChoiceChange={setPendingFamilyTableFreeChoice}
+              disabled={false}
+              isSecondaryRoll={false}
+              onSecondaryRoll={handleFamilyTableSecondaryRoll}
+              isFreeReroll={!familyTableFreeRerollUsed && familyTableRollResult !== null && showFamilyTableSecondaryView}
+            />
+            
+            {/* Secondary Roll Table (shown when first roll is 100) */}
+            {showFamilyTableSecondaryView && familyTable && (
+              <Box sx={{ mt: 3 }}>
+                <RollTableView
+                  table={familyTable}
+                  rollResult={familyTableSecondaryRollResult}
+                  onRoll={handleFamilyTableSecondaryRollResult}
+                  onReroll={handleFamilyTableSecondaryReroll}
+                  onMinimize={() => setShowFamilyTableSecondaryView(false)}
+                  rerolls={remainingRerolls}
+                  freeChoiceTokens={remainingFreeSelections}
+                  onUseFreeChoice={handleFamilyTableSecondaryUseFreeChoice}
+                  onPendingFreeChoiceChange={setPendingFamilyTableSecondaryFreeChoice}
+                  disabled={false}
+                  isSecondaryRoll={true}
+                />
+              </Box>
+            )}
+          </Box>
+        ) : (
+          <Box sx={{ mt: 3 }}>
+            {familyTableLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+              </Box>
+            ) : familyTable ? (
+              <RollTableCard
+                tableSlug="rollpersonens-familj"
+                tableName={familyTable.name}
+                onRoll={async () => {
+                  const diceResult = rollDiceForTable(familyTable.dice || '1T100');
+                  const entry = findEntryInTable(diceResult.value, familyTable.entries);
+                  await handleFamilyTableRoll({
+                    rollValue: diceResult.value,
+                    entry,
+                    diceDetails: diceResult.details
+                  });
+                }}
+                onView={() => setShowFamilyTableView(true)}
+                rollResult={familyTableRollResult}
+                rerolls={(() => {
+                  // Check if original roll was 100
+                  if (familyTableRollResult && familyTable && familyTable.entries) {
+                    const maxEntry = familyTable.entries.reduce((max, entry) => 
+                      entry.maxValue > max.maxValue ? entry : max
+                    );
+                    const was100Roll = familyTableRollResult.rollValue >= maxEntry.minValue && 
+                                      familyTableRollResult.rollValue <= maxEntry.maxValue;
+                    // If 100 was rolled and free reroll not used, show at least 1
+                    if (was100Roll && !familyTableFreeRerollUsed) {
+                      return Math.max(remainingRerolls, 1);
+                    }
+                  }
+                  return remainingRerolls;
+                })()}
+                onReroll={handleFamilyTableReroll}
+                freeChoiceTokens={remainingFreeSelections}
+                onUseFreeChoice={handleFamilyTableUseFreeChoice}
+                disabled={false}
+              />
+            ) : null}
+          </Box>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Avbryt</Button>
-        <Button onClick={handleConfirm} variant="contained" disabled={!parentStatus}>
+        <Button 
+          onClick={handleConfirm} 
+          variant="contained" 
+          disabled={
+            !parentStatus || 
+            // Must have rolled on family table
+            (familyTableRollResult === null) ||
+            // If secondary roll view is open (rolled 100), must have used free reroll on original table
+            (showFamilyTableSecondaryView && !familyTableFreeRerollUsed) ||
+            // If secondary roll view is open, must have rolled on it
+            (showFamilyTableSecondaryView && familyTableSecondaryRollResult === null)
+          }
+        >
           Bekräfta
         </Button>
       </DialogActions>
@@ -1376,6 +1710,7 @@ FamilyDialog.propTypes = {
   ageData: PropTypes.object,
   selectedRace: PropTypes.object,
   raceCategory: PropTypes.object,
-  rerolls: PropTypes.number
+  rerolls: PropTypes.number,
+  freeSelections: PropTypes.number
 };
 

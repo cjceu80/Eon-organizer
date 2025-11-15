@@ -522,6 +522,7 @@ export default function CharacterCreationDialog({
           selectedRace={selectedRace}
           raceCategory={raceCategory}
           rerolls={world?.settings?.rerolls || 0}
+          freeSelections={world?.settings?.freeSelections || 0}
         />
       )}
 
