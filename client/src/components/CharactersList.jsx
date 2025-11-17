@@ -87,7 +87,7 @@ export default function CharactersList() {
               <Grid item xs={12} sm={6} md={4} key={character.id || character._id}>
                 <Card
                   component={Link}
-                  to={`/world/${character.world.id || character.world._id}`}
+                  to={`/character/${character.id || character._id}`}
                   sx={{
                     textDecoration: 'none',
                     display: 'block',

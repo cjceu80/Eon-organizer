@@ -25,11 +25,13 @@ import {
   Grid
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import CasinoIcon from '@mui/icons-material/Casino';
 import { 
   EON_ATTRIBUTES, 
   rollStatsForMethod,
   rollT6Multiple
 } from '../../utils/dice';
+import DiceRollDisplay from '../DiceRollDisplay';
 
 export default function StatRollingDialog({ 
   onClose, 
@@ -61,7 +63,7 @@ export default function StatRollingDialog({
     BIL: 0
   });
 
-  // Load saved state or initialize rolling
+  // Load saved state (no automatic rolling)
   useEffect(() => {
     if (savedState) {
       // Restore from saved state
@@ -74,9 +76,8 @@ export default function StatRollingDialog({
       if (savedState.femaleAttributeModifications) setFemaleAttributeModifications(savedState.femaleAttributeModifications);
       setInitialRoll(true);
     } else if (!initialRoll) {
-      // No saved state, do initial roll
+      // No saved state, initialize but don't roll
       setRemainingRerolls(rerolls);
-      handleInitialRoll();
       setInitialRoll(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,6 +140,76 @@ export default function StatRollingDialog({
     if (consumeReroll && remainingRerolls > 0) {
       setRemainingRerolls(remainingRerolls - 1);
     }
+  };
+  
+  const rollSingleAttribute = (attr) => {
+    let rolls;
+    let total;
+    
+    if (statRollMethod === 'höga attribut') {
+      const allRolls = rollT6Multiple(4);
+      const sortedRolls = [...allRolls].sort((a, b) => a - b);
+      const dropped = sortedRolls[0];
+      const kept = sortedRolls.slice(1);
+      rolls = { all: allRolls, kept, dropped };
+      total = kept.reduce((a, b) => a + b, 0);
+    } else if (statRollMethod === 'hjälteattribut') {
+      rolls = rollT6Multiple(2);
+      total = rolls.reduce((a, b) => a + b, 0) + 9;
+    } else {
+      // Standard method
+      rolls = rollT6Multiple(3);
+      total = rolls.reduce((a, b) => a + b, 0);
+    }
+    
+    // Apply constraints
+    const constrained = applyAttributeConstraints({ [attr]: total });
+    total = constrained[attr];
+    
+    return { rolls, total };
+  };
+
+  const handleRollAttribute = (attr) => {
+    if (!statsResult) {
+      // Initialize statsResult if it doesn't exist
+      const result = {
+        attributes: {},
+        rolls: {}
+      };
+      setStatsResult(result);
+    }
+    
+    const { rolls, total } = rollSingleAttribute(attr);
+    
+    // Update stats result
+    const newResult = { ...statsResult };
+    newResult.attributes[attr] = total;
+    newResult.rolls[attr] = rolls;
+    setStatsResult(newResult);
+  };
+
+  const handleRollAll = () => {
+    if (!statsResult) {
+      // Initialize statsResult if it doesn't exist
+      const result = {
+        attributes: {},
+        rolls: {},
+        sets: statRollMethod === 'anpassad' ? [] : undefined
+      };
+      setStatsResult(result);
+    }
+    
+    const newResult = { ...statsResult };
+    newResult.attributes = {};
+    newResult.rolls = {};
+    
+    EON_ATTRIBUTES.forEach(attr => {
+      const { rolls, total } = rollSingleAttribute(attr);
+      newResult.attributes[attr] = total;
+      newResult.rolls[attr] = rolls;
+    });
+    
+    setStatsResult(newResult);
   };
 
   const handleRerollAll = () => {
@@ -337,13 +408,13 @@ export default function StatRollingDialog({
     if (statRollMethod === 'anpassad') {
       baseAttributes = {};
       EON_ATTRIBUTES.forEach(attr => {
-        const selectedSet = statsResult.sets.find(s => s.id === selectedAttributes[attr]);
+        const selectedSet = statsResult?.sets?.find(s => s.id === selectedAttributes[attr]);
         if (selectedSet) {
           baseAttributes[attr] = selectedSet.total;
         }
       });
     } else {
-      baseAttributes = { ...statsResult.attributes };
+      baseAttributes = { ...(statsResult?.attributes || {}) };
     }
 
     // Apply feminine attribute modifications if applicable
@@ -382,7 +453,7 @@ export default function StatRollingDialog({
       // Build attributes object from selected sets
       const attributes = {};
       EON_ATTRIBUTES.forEach(attr => {
-        const selectedSet = statsResult.sets.find(s => s.id === selectedAttributes[attr]);
+        const selectedSet = statsResult?.sets?.find(s => s.id === selectedAttributes[attr]);
         if (selectedSet) {
           attributes[attr] = selectedSet.total;
         }
@@ -396,13 +467,13 @@ export default function StatRollingDialog({
       if (statRollMethod === 'anpassad') {
         baseAttributes = {};
         EON_ATTRIBUTES.forEach(attr => {
-          const selectedSet = statsResult.sets.find(s => s.id === selectedAttributes[attr]);
+          const selectedSet = statsResult?.sets?.find(s => s.id === selectedAttributes[attr]);
           if (selectedSet) {
             baseAttributes[attr] = selectedSet.total;
           }
         });
       } else {
-        baseAttributes = { ...statsResult.attributes };
+        baseAttributes = { ...(statsResult?.attributes || {}) };
       }
 
       onConfirm({
@@ -419,12 +490,12 @@ export default function StatRollingDialog({
     } else {
       const finalAttributes = getFinalAttributes();
       // Get base attributes (pure rolled values, before race and feminine modifications)
-      const baseAttributes = { ...statsResult.attributes };
+      const baseAttributes = { ...(statsResult?.attributes || {}) };
 
       onConfirm({
         attributes: finalAttributes,
         baseAttributes: baseAttributes, // Base rolled values (before race modifiers, before feminine modifications)
-        rolls: statsResult.rolls,
+        rolls: statsResult?.rolls || {},
         method: statRollMethod,
         rerollsUsed: rerolls - remainingRerolls,
         gender,
@@ -472,9 +543,24 @@ export default function StatRollingDialog({
 
   const canReroll = remainingRerolls > 0 && statRollMethod !== 'anpassad';
 
-  if (!statsResult) {
-    return null;
-  }
+  // Initialize empty statsResult if it doesn't exist (use useEffect to avoid setting state during render)
+  useEffect(() => {
+    if (!statsResult) {
+      const emptyResult = {
+        attributes: {},
+        rolls: {},
+        sets: statRollMethod === 'anpassad' ? [] : undefined
+      };
+      setStatsResult(emptyResult);
+      if (statRollMethod === 'anpassad') {
+        const initial = {};
+        EON_ATTRIBUTES.forEach(attr => {
+          initial[attr] = null;
+        });
+        setSelectedAttributes(initial);
+      }
+    }
+  }, [statRollMethod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -484,8 +570,10 @@ export default function StatRollingDialog({
           Metod: {statRollMethod === 'standard' ? 'Standard' : 
                   statRollMethod === 'anpassad' ? 'Anpassad' :
                   statRollMethod === 'höga attribut' ? 'Höga attribut' : 'Hjälteattribut'}
-          {remainingRerolls > 0 && ` • ${remainingRerolls} omkastningar kvar`}
         </Typography>
+        <Alert severity="info" sx={{ mt: 1, mb: 0 }}>
+          Klicka på tärningsikonen för varje attribut för att rulla det individuellt.
+        </Alert>
       </DialogTitle>
       <DialogContent>
         {/* Gender Selection */}
@@ -505,7 +593,7 @@ export default function StatRollingDialog({
         </Box>
 
         {/* Feminine Attribute Modifications */}
-        {feminineAttributes && gender === 'kvinna' && statsResult && (
+        {feminineAttributes && gender === 'kvinna' && statsResult?.attributes && (
           <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography variant="subtitle1" gutterBottom>
               Kvinnliga attributmodifikationer
@@ -553,29 +641,58 @@ export default function StatRollingDialog({
         {statRollMethod === 'anpassad' ? (
           <Box>
             <Alert severity="info" sx={{ mb: 2 }}>
-              Dra ett värde från poolen nedan och släpp på ett attribut, eller klicka för att välja.
+              Klicka på "Rulla nytt värde" för att skapa värden. Dra ett värde från poolen och släpp på ett attribut, eller klicka för att välja.
             </Alert>
             
             {/* Available sets pool */}
             <Box sx={{ mb: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Tillgängliga värden:
-                {remainingRerolls > 0 && (
-                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                    ({remainingRerolls} omkastningar kvar)
-                  </Typography>
-                )}
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle2">
+                  Tillgängliga värden:
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<CasinoIcon />}
+                  onClick={() => {
+                    const rollResult = rollT6Multiple(3);
+                    const total = rollResult.reduce((a, b) => a + b, 0);
+                    const constrained = applyAttributeConstraints({ temp: total });
+                    const newSet = {
+                      id: Date.now(),
+                      rolls: rollResult,
+                      total: constrained.temp
+                    };
+                    const newResult = { ...statsResult };
+                    newResult.sets = [...(newResult.sets || []), newSet];
+                    newResult.sets.sort((a, b) => b.total - a.total);
+                    setStatsResult(newResult);
+                  }}
+                >
+                  Rulla nytt värde
+                </Button>
+              </Box>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {statsResult.sets.map(set => {
+                {(statsResult.sets || []).map(set => {
                   const isUsed = isSetUsed(set.id);
                   const owner = getSetOwner(set.id);
                   const canReroll = remainingRerolls > 0;
                   
                   return (
-                    <Box key={set.id} sx={{ position: 'relative', display: 'inline-flex' }}>
+                    <Box key={set.id} sx={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
                       <Chip
-                        label={`${set.total} (${set.rolls.join(', ')})`}
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <DiceRollDisplay 
+                              rolls={set.rolls} 
+                              diceType="T6" 
+                              size="small"
+                            />
+                            <Typography variant="body2" sx={{ ml: 0.5, fontWeight: 'bold' }}>
+                              = {set.total}
+                            </Typography>
+                          </Box>
+                        }
                         draggable={true}
                         onDragStart={(e) => handleDragStart(e, set)}
                         onDragEnd={handleDragEnd}
@@ -631,7 +748,7 @@ export default function StatRollingDialog({
                 </TableHead>
                 <TableBody>
                   {EON_ATTRIBUTES.map(attr => {
-                    const selectedSet = statsResult.sets.find(s => s.id === selectedAttributes[attr]);
+                    const selectedSet = statsResult?.sets?.find(s => s.id === selectedAttributes[attr]);
                     const isDragOver = dragOverAttribute === attr;
                     
                     // Calculate race-modified value
@@ -674,8 +791,14 @@ export default function StatRollingDialog({
                         <TableCell><strong>{attr}</strong></TableCell>
                         <TableCell>
                           {selectedSet ? (
-                            <Chip 
-                              label={`${selectedSet.total} (${selectedSet.rolls.join(', ')})`}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <DiceRollDisplay 
+                                rolls={selectedSet.rolls} 
+                                diceType="T6" 
+                                size="small"
+                              />
+                              <Chip 
+                              label={`= ${selectedSet.total}`}
                               color="primary"
                               size="small"
                               onDelete={() => {
@@ -684,6 +807,7 @@ export default function StatRollingDialog({
                                 setSelectedAttributes(newSelected);
                               }}
                             />
+                            </Box>
                           ) : (
                             <Typography 
                               variant="body2" 
@@ -745,7 +869,7 @@ export default function StatRollingDialog({
                           <TableCell><strong>{attr}</strong></TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                              {statsResult.sets.map(set => {
+                              {(statsResult.sets || []).map(set => {
                                 const isSelected = selectedAttributes[attr] === set.id;
                                 const isUsed = isSetUsed(set.id);
                                 const owner = getSetOwner(set.id);
@@ -754,7 +878,18 @@ export default function StatRollingDialog({
                                 return (
                                   <Chip
                                     key={set.id}
-                                    label={`${set.total} (${set.rolls.join(', ')})`}
+                                    label={
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                        <DiceRollDisplay 
+                                          rolls={set.rolls} 
+                                          diceType="T6" 
+                                          size="small"
+                                        />
+                                        <Typography variant="caption" sx={{ ml: 0.5, fontWeight: 'bold' }}>
+                                          = {set.total}
+                                        </Typography>
+                                      </Box>
+                                    }
                                     onClick={() => isUsable ? handleSelectAnpassadSet(attr, set) : null}
                                     color={isSelected ? 'primary' : 'default'}
                                     variant={isSelected ? 'filled' : 'outlined'}
@@ -799,10 +934,10 @@ export default function StatRollingDialog({
               <TableBody>
                 {EON_ATTRIBUTES.map(attr => {
                   // Get base value from stats result
-                  let value = statsResult.attributes[attr];
+                  let value = statsResult?.attributes?.[attr];
                   
                   // Apply feminine modifications if applicable
-                  if (feminineAttributes && gender === 'kvinna') {
+                  if (feminineAttributes && gender === 'kvinna' && value !== undefined) {
                     if (attr === 'STY') {
                       value = value - styDecrease;
                     } else if (femaleAttributeModifications[attr]) {
@@ -810,7 +945,7 @@ export default function StatRollingDialog({
                     }
                   }
                   
-                  const rolls = statsResult.rolls[attr];
+                  const rolls = statsResult?.rolls?.[attr];
                   
                   // Calculate race-modified value
                   // Handle both Map and plain object formats
@@ -822,46 +957,84 @@ export default function StatRollingDialog({
                       raceModifier = selectedRace.modifiers[attr] || 0;
                     }
                   }
-                  const modifiedValue = value + raceModifier;
+                  const modifiedValue = (value !== undefined && value !== null && !isNaN(value)) ? value + raceModifier : undefined;
                   
-                  let rollDisplay = '';
-                  if (statRollMethod === 'höga attribut') {
-                    rollDisplay = `${rolls.kept.join(', ')} (kastade: ${rolls.all.join(', ')}, slängd: ${rolls.dropped})`;
-                  } else if (statRollMethod === 'hjälteattribut') {
-                    rollDisplay = `${rolls.join(', ')} + 9`;
-                  } else {
-                    rollDisplay = rolls.join(', ');
-                  }
+                  // rollDisplay is no longer needed since we use DiceRollDisplay
 
                   return (
                     <TableRow key={attr}>
                       <TableCell><strong>{attr}</strong></TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {rollDisplay}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {rolls ? (
+                            <>
+                              {statRollMethod === 'höga attribut' ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <DiceRollDisplay 
+                                    rolls={rolls.kept} 
+                                    diceType="T6" 
+                                    size="small"
+                                  />
+                                  <Typography variant="caption" color="text.secondary">
+                                    (slängd: {rolls.dropped})
+                                  </Typography>
+                                </Box>
+                              ) : statRollMethod === 'hjälteattribut' ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <DiceRollDisplay 
+                                    rolls={rolls} 
+                                    diceType="T6" 
+                                    size="small"
+                                  />
+                                  <Typography variant="body2">+ 9</Typography>
+                                </Box>
+                              ) : (
+                                <DiceRollDisplay 
+                                  rolls={rolls} 
+                                  diceType="T6" 
+                                  size="small"
+                                />
+                              )}
+                            </>
+                          ) : null}
+                          <Button
+                            size="small"
+                            onClick={() => handleRollAttribute(attr)}
+                            color="primary"
+                            variant="outlined"
+                            startIcon={<CasinoIcon />}
+                          >
+                            Slå
+                          </Button>
+                        </Box>
                       </TableCell>
                       <TableCell align="right">
-                        <Typography variant="h6">{value}</Typography>
+                        <Typography variant="h6">
+                          {value !== undefined && value !== null && !isNaN(value) ? value : ''}
+                        </Typography>
                       </TableCell>
                       {selectedRace?.modifiers && (
                         <TableCell align="right">
-                          <Typography 
-                            variant="h6" 
-                            sx={{ fontWeight: 'bold' }}
-                          >
-                            {modifiedValue}
-                            {raceModifier !== 0 && (
-                              <Typography 
-                                component="span" 
-                                variant="caption" 
-                                color="text.secondary"
-                                sx={{ ml: 0.5 }}
-                              >
-                                ({raceModifier > 0 ? '+' : ''}{raceModifier})
-                              </Typography>
-                            )}
-                          </Typography>
+                          {modifiedValue !== undefined && modifiedValue !== null && !isNaN(modifiedValue) ? (
+                            <Typography 
+                              variant="h6" 
+                              sx={{ fontWeight: 'bold' }}
+                            >
+                              {modifiedValue}
+                              {raceModifier !== 0 && (
+                                <Typography 
+                                  component="span" 
+                                  variant="caption" 
+                                  color="text.secondary"
+                                  sx={{ ml: 0.5 }}
+                                >
+                                  ({raceModifier > 0 ? '+' : ''}{raceModifier})
+                                </Typography>
+                              )}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary"></Typography>
+                          )}
                         </TableCell>
                       )}
                       {canReroll && (
@@ -888,15 +1061,15 @@ export default function StatRollingDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Avbryt</Button>
-        <Button 
-          onClick={handleRerollAll} 
-          variant="outlined"
-          disabled={remainingRerolls <= 0 && freeRerollAllCount <= 0}
-          startIcon={<RefreshIcon />}
-        >
-          Slå om allt
-          {freeRerollAllCount > 0 && ` (${freeRerollAllCount} gratis kvar)`}
-        </Button>
+        {statRollMethod !== 'anpassad' && (
+          <Button 
+            onClick={handleRollAll}
+            variant="outlined"
+            startIcon={<CasinoIcon />}
+          >
+            Rulla alla
+          </Button>
+        )}
         <Button 
           onClick={handleConfirm} 
           variant="contained"

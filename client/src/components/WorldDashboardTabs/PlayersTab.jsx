@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/useAuth';
 import { Box, Typography, Button, Stack, Grid, Card, CardContent, CardActions, Chip, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
@@ -256,7 +257,20 @@ export default function PlayersTab({ worldId, world }) {
         <Grid container spacing={3}>
           {characters.map(character => (
             <Grid item xs={12} sm={6} md={4} key={character._id}>
-              <Card sx={{ height: '100%' }}>
+              <Card 
+                component={Link}
+                to={`/character/${character._id}`}
+                sx={{ 
+                  height: '100%',
+                  textDecoration: 'none',
+                  display: 'block',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4
+                  }
+                }}
+              >
                 <CardContent>
                   <Typography variant="h6" component="h3" gutterBottom>
                     {character.name}
@@ -285,12 +299,15 @@ export default function PlayersTab({ worldId, world }) {
                   </Box>
                 </CardContent>
                 {(character.owner?.id === user?.id || world?.admin === user?.id) && (
-                  <CardActions>
+                  <CardActions onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="small"
                       color="error"
                       startIcon={<DeleteIcon />}
-                      onClick={() => setCharacterToDelete(character)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCharacterToDelete(character);
+                      }}
                     >
                       Radera
                     </Button>

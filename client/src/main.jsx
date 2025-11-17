@@ -9,6 +9,7 @@ import Login from './components/Login'
 import Register from './components/Register'
 import Dashboard from './components/Dashboard'
 import WorldDashboard from './components/WorldDashboard'
+import CharacterView from './components/CharacterView'
 //import './index.css'
 
 const theme = createTheme({
@@ -39,6 +40,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <WorldDashboard />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: "/character/:characterId",
+    element: (
+      <ProtectedRoute>
+        <CharacterView />
       </ProtectedRoute>
     )
   },

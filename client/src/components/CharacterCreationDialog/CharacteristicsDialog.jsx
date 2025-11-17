@@ -47,6 +47,7 @@ export default function CharacteristicsDialog({
 }) {
   const [characteristics, setCharacteristics] = useState({});
   const [specializations, setSpecializations] = useState({});
+  const [characteristicRolls, setCharacteristicRolls] = useState({});
   const [characteristicsData, setCharacteristicsData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -145,6 +146,10 @@ export default function CharacteristicsDialog({
     setCharacteristics(prev => ({
       ...prev,
       [characteristicKey]: total
+    }));
+    setCharacteristicRolls(prev => ({
+      ...prev,
+      [characteristicKey]: rolls
     }));
   };
 
@@ -292,6 +297,7 @@ export default function CharacteristicsDialog({
                         onValueChange={handleValueChange}
                         onRoll={handleRoll}
                         onSpecializationChange={handleSpecializationChange}
+                        rolls={characteristicRolls[char.key]}
                       />
                     );
                   })}

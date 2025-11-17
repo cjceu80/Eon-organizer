@@ -1,0 +1,121 @@
+{
+  "name": "Example Character",
+  "owner": "1234567890",
+  "world": "1234567890",
+  "basics": {
+    "age": 20,
+    "gender": "Male",
+    "race": "Human",
+    "profession": "Soldier",
+    "height": 180,
+    "weight": 80,
+    "build": "Average",
+    "buildRollDetails": 6,
+    "hair": "Brown",
+    "eyes": "Brown",
+    "skin": "Fair",
+    "home": "Valldiania",
+    "religion": "none"
+  },
+  "attributes": {
+    "STY": 10,
+    "TÅL": 10,
+    "RÖR": 10,
+    "PER": 10,
+    "PSY": 10,
+    "VIL": 10,
+    "BIL": 10,
+    "SYN": 10,
+    "HÖR": 10
+  },
+  "characteristics": {
+    "Lojalitet": 16,
+    "Heder": 10,
+    "Amor": 10,
+    "Aggression": 10,
+    "Tro": 10,
+    "Generositet": 10,
+    "Rykte": 10,
+    "Tur": 10,
+    "Qadosh": 10
+  },
+  "specializations": {
+    "Lojalitet": "Riket"
+  },
+  "advantages": [
+    {}
+  ],
+  "disadvantages": [
+    {}
+  ],
+  "meleeWeapons": [
+    {}
+  ],
+  "rangedWeapons": [
+    {}
+  ],
+  "armor": [
+    {}
+  ],
+  "shields": [
+    {}
+  ],
+  "inventory": [
+    {}
+  ],
+  "ownedItems": [
+    {}
+  ],
+  "professionalSkills": [
+    {
+      "name": "Stridsvana",
+      "level": 10
+    },
+    {
+      "name": "Berättarkonst",
+      "level": 10,
+      "specialization": "Sagor"
+    },
+    {
+      "name": "Dansa",
+      "level": 10,
+      "specialization": "Folklig dans"
+    }
+  ],
+  "otherSkills": [
+    {
+      "name": "Fingerfärdighet",
+      "level": 10
+    },
+    {
+      "name": "Fiske",
+      "level": 10,
+      "specialization": "Bäckfiske"
+    }
+  ],
+  "languages": [
+    {
+      "name": "Jargiska",
+      "level": 10
+    },
+    {
+      "name": "Alviska",
+      "level": 10
+    }
+  ],
+  "connections": [
+    {
+      "id": "1234567890",
+      "relationship": "Family",
+      "description": "This is a description of the connection"
+    },
+    {
+      "id": "1234567890",
+      "relationship": "Friend",
+      "description": "This is a description of the connection"
+    }
+  ],
+  "bio": [
+    {}
+  ]
+}

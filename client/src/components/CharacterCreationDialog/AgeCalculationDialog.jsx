@@ -21,6 +21,8 @@ import {
   Grid
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import CasinoIcon from '@mui/icons-material/Casino';
+import DiceRollDisplay from '../DiceRollDisplay';
 import { rollObT6WithDetails, rollT6Multiple } from '../../utils/dice';
 
 // Age bonus table
@@ -120,7 +122,7 @@ export default function AgeCalculationDialog({
   const [remainingRerolls, setRemainingRerolls] = useState(rerolls);
   const [initialRoll, setInitialRoll] = useState(false);
 
-  // Load saved state or initialize rolling
+  // Load saved state or initialize
   useEffect(() => {
     if (savedState) {
       // Restore from saved state
@@ -130,9 +132,7 @@ export default function AgeCalculationDialog({
       if (savedState.remainingRerolls !== undefined) setRemainingRerolls(savedState.remainingRerolls);
       setInitialRoll(true);
     } else if (!initialRoll) {
-      // No saved state, do initial rolls
-      handleRollAge();
-      handleRollKroppsbyggnad();
+      // No saved state, initialize but don't roll
       setInitialRoll(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,8 +189,9 @@ export default function AgeCalculationDialog({
   // Calculate length after kroppsbyggnad is set (since weight depends on kroppsbyggnad type)
   // Note: handleRollKroppsbyggnad now calls handleRollLength directly with shared dice,
   // so this useEffect is mainly for when varierandeVikt, selectedRace, or gender changes
+  // Only recalculate if kroppsbyggnad was already rolled
   useEffect(() => {
-    if (kroppsbyggnadResult && initialRoll) {
+    if (kroppsbyggnadResult && initialRoll && kroppsbyggnadResult.t6Rolls) {
       // Use the same t6Rolls from kroppsbyggnad to keep them in sync
       handleRollLength(kroppsbyggnadResult.t6Rolls, kroppsbyggnadResult.type);
     }
@@ -381,9 +382,78 @@ export default function AgeCalculationDialog({
     });
   };
 
-  if (!ageResult || !kroppsbyggnadResult || !lengthResult) {
-    return null;
-  }
+  // Initialize empty results if they don't exist (only once on mount or when attributes change)
+  useEffect(() => {
+    if (!ageResult) {
+      setAgeResult({
+        bil: attributes?.BIL || 0,
+        ob3T6: null,
+        age: null,
+        apparentAge: null,
+        bonus: 0
+      });
+    }
+    if (!kroppsbyggnadResult) {
+      setKroppsbyggnadResult({
+        sty: attributes?.STY || 0,
+        tal: attributes?.TÅL || 0,
+        t6Rolls: null,
+        t6Total: null,
+        total: null,
+        type: null,
+        skadekolumner: null
+      });
+    }
+    if (!lengthResult) {
+      setLengthResult({
+        sty: attributes?.STY || 0,
+        tal: attributes?.TÅL || 0,
+        t6Rolls: null,
+        t6Total: null,
+        length: null,
+        weight: null,
+        lengthConstant: null,
+        weightConstant: null,
+        baseWeight: null,
+        weightMultiplier: null,
+        kroppsbyggnadType: null
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attributes?.BIL, attributes?.STY, attributes?.TÅL]);
+  
+  // Use state values or provide defaults for display
+  const displayAgeResult = ageResult || {
+    bil: attributes?.BIL || 0,
+    ob3T6: null,
+    age: null,
+    apparentAge: null,
+    bonus: 0
+  };
+  
+  const displayKroppsbyggnadResult = kroppsbyggnadResult || {
+    sty: attributes?.STY || 0,
+    tal: attributes?.TÅL || 0,
+    t6Rolls: null,
+    t6Total: null,
+    total: null,
+    type: null,
+    skadekolumner: null
+  };
+  
+  const displayLengthResult = lengthResult || {
+    sty: attributes?.STY || 0,
+    tal: attributes?.TÅL || 0,
+    t6Rolls: null,
+    t6Total: null,
+    length: null,
+    weight: null,
+    lengthConstant: null,
+    weightConstant: null,
+    baseWeight: null,
+    weightMultiplier: null,
+    kroppsbyggnadType: null
+  };
 
   return (
     <>
@@ -411,51 +481,72 @@ export default function AgeCalculationDialog({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
                   <Box>
                     <Typography variant="body2" color="text.secondary">BIL</Typography>
-                    <Typography variant="h5">{ageResult.bil}</Typography>
+                    <Typography variant="h5">{displayAgeResult.bil}</Typography>
                   </Box>
                   <Typography variant="h5">+</Typography>
                   <Box sx={{ flex: '0 0 auto', minWidth: 120 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2" color="text.secondary">Ob3T6</Typography>
-                      {remainingRerolls > 0 && (
-                        <Tooltip title={`Återkasta Ob3T6 (${remainingRerolls} kvar)`}>
-                          <IconButton 
-                            size="small" 
-                            onClick={handleRerollAge}
-                            color="primary"
-                          >
-                            <RefreshIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                      {!displayAgeResult.ob3T6 ? (
+                        <Button
+                          size="small"
+                          onClick={handleRollAge}
+                          color="primary"
+                          variant="outlined"
+                          startIcon={<CasinoIcon />}
+                        >
+                          Slå
+                        </Button>
+                      ) : (
+                        remainingRerolls > 0 && (
+                          <Tooltip title={`Återkasta Ob3T6 (${remainingRerolls} kvar)`}>
+                            <IconButton 
+                              size="small" 
+                              onClick={handleRerollAge}
+                              color="primary"
+                            >
+                              <RefreshIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )
                       )}
                     </Box>
-                    <Typography variant="h5">
-                      {ageResult.ob3T6.total}
-                      <Typography 
-                        component="span" 
-                        variant="caption" 
-                        color="text.secondary"
-                        sx={{ ml: 1 }}
-                      >
-                        ({ageResult.ob3T6.initialRolls.join(', ')}
-                        {ageResult.ob3T6.extraRolls.length > 0 && ` → ${ageResult.ob3T6.extraRolls.join(', ')}`})
+                    {displayAgeResult.ob3T6 ? (
+                      <Box sx={{ mt: 1 }}>
+                        <DiceRollDisplay 
+                          rolls={displayAgeResult.ob3T6.initialRolls} 
+                          diceType="T6" 
+                          size="small"
+                        />
+                        {displayAgeResult.ob3T6.extraRolls.length > 0 && (
+                          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            → {displayAgeResult.ob3T6.extraRolls.join(', ')}
+                          </Typography>
+                        )}
+                        <Typography variant="h5" sx={{ mt: 0.5 }}>
+                          = {displayAgeResult.ob3T6.total}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Klicka på "Slå" för att rulla
                       </Typography>
-                    </Typography>
+                    )}
                   </Box>
                   <Typography variant="h5">=</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Verklig ålder</Typography>
                     <Typography variant="h4" color="primary.main" sx={{ fontWeight: 'bold' }}>
-                      {ageResult.age}
+                      {displayAgeResult.age || '-'}
                     </Typography>
                   </Box>
-                  {ageResult.apparentAge !== undefined && ageResult.apparentAge !== ageResult.age && (
+                  {displayAgeResult.apparentAge !== undefined && displayAgeResult.apparentAge !== displayAgeResult.age && (
                     <>
                       <Typography variant="h5">→</Typography>
                       <Box>
                         <Typography variant="body2" color="text.secondary">Synlig ålder</Typography>
                         <Typography variant="h4" color="secondary.main" sx={{ fontWeight: 'bold' }}>
-                          {ageResult.apparentAge}
+                          {displayAgeResult.apparentAge}
                         </Typography>
                       </Box>
                     </>
@@ -469,7 +560,7 @@ export default function AgeCalculationDialog({
                 Valfria enheter baserat på ålder:
               </Typography>
               <Chip 
-                label={`+${ageResult.bonus} Valfria enheter`}
+                label={`+${displayAgeResult.bonus} Valfria enheter`}
                 color="success"
                 size="large"
                 sx={{ fontSize: '1.1rem', fontWeight: 'bold', py: 2 }}
@@ -490,7 +581,7 @@ export default function AgeCalculationDialog({
                   </TableHead>
                   <TableBody>
                     {AGE_BONUS_TABLE.map((range, index) => {
-                      const isCurrentRange = ageResult.age >= range.min && ageResult.age <= range.max;
+                      const isCurrentRange = displayAgeResult.age && displayAgeResult.age >= range.min && displayAgeResult.age <= range.max;
                       const ageRange = range.max === Infinity 
                         ? `${range.min}+` 
                         : `${range.min}-${range.max}`;
@@ -533,46 +624,63 @@ export default function AgeCalculationDialog({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                   <Box>
                     <Typography variant="body2" color="text.secondary">STY</Typography>
-                    <Typography variant="h5">{kroppsbyggnadResult.sty}</Typography>
+                    <Typography variant="h5">{displayKroppsbyggnadResult.sty}</Typography>
                   </Box>
                   <Typography variant="h5">+</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">TÅL</Typography>
-                    <Typography variant="h5">{kroppsbyggnadResult.tal}</Typography>
+                    <Typography variant="h5">{displayKroppsbyggnadResult.tal}</Typography>
                   </Box>
                   <Typography variant="h5">+</Typography>
                   <Box sx={{ flex: 1, minWidth: 120 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2" color="text.secondary">3T6</Typography>
-                      {remainingRerolls > 0 && (
-                        <Tooltip title={`Återkasta 3T6 (${remainingRerolls} kvar)`}>
-                          <IconButton 
-                            size="small" 
-                            onClick={handleRerollKroppsbyggnad}
-                            color="primary"
-                          >
-                            <RefreshIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                      {!displayKroppsbyggnadResult.t6Rolls ? (
+                        <Button
+                          size="small"
+                          onClick={handleRollKroppsbyggnad}
+                          color="primary"
+                          variant="outlined"
+                          startIcon={<CasinoIcon />}
+                        >
+                          Slå
+                        </Button>
+                      ) : (
+                        remainingRerolls > 0 && (
+                          <Tooltip title={`Återkasta 3T6 (${remainingRerolls} kvar)`}>
+                            <IconButton 
+                              size="small" 
+                              onClick={handleRerollKroppsbyggnad}
+                              color="primary"
+                            >
+                              <RefreshIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )
                       )}
                     </Box>
-                    <Typography variant="h5">
-                      {kroppsbyggnadResult.t6Total}
-                      <Typography 
-                        component="span" 
-                        variant="caption" 
-                        color="text.secondary"
-                        sx={{ ml: 1 }}
-                      >
-                        ({kroppsbyggnadResult.t6Rolls.join(', ')})
+                    {displayKroppsbyggnadResult.t6Rolls ? (
+                      <Box sx={{ mt: 1 }}>
+                        <DiceRollDisplay 
+                          rolls={displayKroppsbyggnadResult.t6Rolls} 
+                          diceType="T6" 
+                          size="small"
+                        />
+                        <Typography variant="h5" sx={{ mt: 0.5 }}>
+                          = {displayKroppsbyggnadResult.t6Total}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Klicka på "Slå" för att rulla
                       </Typography>
-                    </Typography>
+                    )}
                   </Box>
                   <Typography variant="h5">=</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Totalt</Typography>
                     <Typography variant="h4" color="primary.main" sx={{ fontWeight: 'bold' }}>
-                      {kroppsbyggnadResult.total}
+                      {displayKroppsbyggnadResult.total || '-'}
                     </Typography>
                   </Box>
                 </Box>
@@ -585,13 +693,13 @@ export default function AgeCalculationDialog({
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <Chip 
-                  label={`Kroppsbyggnad: ${kroppsbyggnadResult.type}`}
+                  label={`Kroppsbyggnad: ${displayKroppsbyggnadResult.type || '-'}`}
                   color="primary"
                   size="large"
                   sx={{ fontSize: '1rem', fontWeight: 'bold', py: 1.5 }}
                 />
                 <Chip 
-                  label={`Skadekolumner: ${kroppsbyggnadResult.skadekolumner}`}
+                  label={`Skadekolumner: ${displayKroppsbyggnadResult.skadekolumner || '-'}`}
                   color="secondary"
                   size="large"
                   sx={{ fontSize: '1rem', fontWeight: 'bold', py: 1.5 }}
@@ -614,7 +722,7 @@ export default function AgeCalculationDialog({
                   </TableHead>
                   <TableBody>
                     {KROPPSBYGGNAD_TABLE.map((range, index) => {
-                      const isCurrentRange = kroppsbyggnadResult.total >= range.min && kroppsbyggnadResult.total <= range.max;
+                      const isCurrentRange = displayKroppsbyggnadResult.total && displayKroppsbyggnadResult.total >= range.min && displayKroppsbyggnadResult.total <= range.max;
                       const valueRange = range.max === Infinity 
                         ? `${range.min}+` 
                         : `${range.min}-${range.max}`;
@@ -661,51 +769,68 @@ export default function AgeCalculationDialog({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                   <Box>
                     <Typography variant="body2" color="text.secondary">STY</Typography>
-                    <Typography variant="h5">{lengthResult.sty}</Typography>
+                    <Typography variant="h5">{displayLengthResult.sty}</Typography>
                   </Box>
                   <Typography variant="h5">+</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">TÅL</Typography>
-                    <Typography variant="h5">{lengthResult.tal}</Typography>
+                    <Typography variant="h5">{displayLengthResult.tal}</Typography>
                   </Box>
                   <Typography variant="h5">+</Typography>
                   <Box sx={{ flex: 1, minWidth: 120 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2" color="text.secondary">3T6</Typography>
-                      {remainingRerolls > 0 && (
-                        <Tooltip title={`Återkasta 3T6 (${remainingRerolls} kvar)`}>
-                          <IconButton 
-                            size="small" 
-                            onClick={handleRerollLength}
-                            color="primary"
-                          >
-                            <RefreshIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                      {!displayLengthResult.t6Rolls ? (
+                        <Button
+                          size="small"
+                          onClick={() => handleRollLength()}
+                          color="primary"
+                          variant="outlined"
+                          startIcon={<CasinoIcon />}
+                        >
+                          Slå
+                        </Button>
+                      ) : (
+                        remainingRerolls > 0 && (
+                          <Tooltip title={`Återkasta 3T6 (${remainingRerolls} kvar)`}>
+                            <IconButton 
+                              size="small" 
+                              onClick={handleRerollLength}
+                              color="primary"
+                            >
+                              <RefreshIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )
                       )}
                     </Box>
-                    <Typography variant="h5">
-                      {lengthResult.t6Total}
-                      <Typography 
-                        component="span" 
-                        variant="caption" 
-                        color="text.secondary"
-                        sx={{ ml: 1 }}
-                      >
-                        ({lengthResult.t6Rolls.join(', ')})
+                    {displayLengthResult.t6Rolls ? (
+                      <Box sx={{ mt: 1 }}>
+                        <DiceRollDisplay 
+                          rolls={displayLengthResult.t6Rolls} 
+                          diceType="T6" 
+                          size="small"
+                        />
+                        <Typography variant="h5" sx={{ mt: 0.5 }}>
+                          = {displayLengthResult.t6Total}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Klicka på "Slå" för att rulla
                       </Typography>
-                    </Typography>
+                    )}
                   </Box>
                   <Typography variant="h5">+</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Raslängdkonstant</Typography>
-                    <Typography variant="h5">{lengthResult.lengthConstant}</Typography>
+                    <Typography variant="h5">{displayLengthResult.lengthConstant || '-'}</Typography>
                   </Box>
                   <Typography variant="h5">=</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Längd (cm)</Typography>
                     <Typography variant="h4" color="primary.main" sx={{ fontWeight: 'bold' }}>
-                      {lengthResult.length}
+                      {displayLengthResult.length || '-'}
                     </Typography>
                   </Box>
                 </Box>
@@ -713,26 +838,26 @@ export default function AgeCalculationDialog({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Längd</Typography>
-                    <Typography variant="h5">{lengthResult.length}</Typography>
+                    <Typography variant="h5">{displayLengthResult.length || '-'}</Typography>
                   </Box>
                   <Typography variant="h5">-</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Rasviktskonstant</Typography>
-                    <Typography variant="h5">{lengthResult.weightConstant}</Typography>
+                    <Typography variant="h5">{displayLengthResult.weightConstant || '-'}</Typography>
                   </Box>
                   <Typography variant="h5">=</Typography>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Basvikt (kg)</Typography>
-                    <Typography variant="h5">{Math.round(lengthResult.baseWeight * 10) / 10}</Typography>
+                    <Typography variant="h5">{displayLengthResult.baseWeight ? Math.round(displayLengthResult.baseWeight * 10) / 10 : '-'}</Typography>
                   </Box>
-                  {varierandeVikt && lengthResult.weightMultiplier !== 1 && (
+                  {varierandeVikt && displayLengthResult.weightMultiplier !== 1 && displayLengthResult.weightMultiplier && (
                     <>
                       <Typography variant="h5">×</Typography>
                       <Box>
                         <Typography variant="body2" color="text.secondary">
-                          Multiplikator ({lengthResult.kroppsbyggnadType})
+                          Multiplikator ({displayLengthResult.kroppsbyggnadType})
                         </Typography>
-                        <Typography variant="h5">{lengthResult.weightMultiplier}</Typography>
+                        <Typography variant="h5">{displayLengthResult.weightMultiplier}</Typography>
                       </Box>
                       <Typography variant="h5">=</Typography>
                     </>
@@ -740,7 +865,7 @@ export default function AgeCalculationDialog({
                   <Box>
                     <Typography variant="body2" color="text.secondary">Vikt (kg)</Typography>
                     <Typography variant="h4" color="primary.main" sx={{ fontWeight: 'bold' }}>
-                      {Math.round(lengthResult.weight * 10) / 10}
+                      {displayLengthResult.weight ? Math.round(displayLengthResult.weight * 10) / 10 : '-'}
                     </Typography>
                   </Box>
                 </Box>

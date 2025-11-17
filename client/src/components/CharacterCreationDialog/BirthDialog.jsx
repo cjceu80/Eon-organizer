@@ -153,41 +153,7 @@ export default function BirthDialog({
     }
   }, [backgroundData, monthRoll, loading, savedState]);
 
-  // Auto-roll week after month is rolled
-  useEffect(() => {
-    if (backgroundData && monthRoll && !weekRoll) {
-      // Roll week
-      const weekRollResult = rollT10();
-      setWeekRoll(weekRollResult);
-      const weeks = backgroundData?.civilized?.weeks || [];
-      const week = weeks.find(w => weekRollResult >= w.min && weekRollResult <= w.max);
-      if (week) {
-        setSelectedWeek(week);
-      }
-      
-      // If week is 9-10, use primitive
-      if (weekRollResult >= 9 && weekRollResult <= 10) {
-        setUsePrimitive(true);
-        // Auto-roll primitive
-        const primitiveRollResult = rollT100WithDetails();
-        setPrimitiveRoll(primitiveRollResult);
-        const primitiveTable = backgroundData?.primitive?.table || [];
-        const primitiveEntry = primitiveTable.find(e => primitiveRollResult.value >= e.min && primitiveRollResult.value <= e.max);
-        if (primitiveEntry) {
-          setSelectedPrimitive(primitiveEntry);
-        }
-      } else {
-        // If week is not 9-10, roll day
-        const dayRollResult = rollT10();
-        setDayRoll(dayRollResult);
-        const weekdays = backgroundData?.civilized?.weekdays || [];
-        const day = weekdays.find(w => dayRollResult >= w.min && dayRollResult <= w.max);
-        if (day) {
-          setSelectedDay(day);
-        }
-      }
-    }
-  }, [backgroundData, monthRoll, weekRoll]);
+  // No automatic rolling - user must press roll buttons
 
   const handleRollPrimitive = () => {
     const roll = rollT100WithDetails();

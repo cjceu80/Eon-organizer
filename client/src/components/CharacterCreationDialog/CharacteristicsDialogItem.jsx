@@ -9,7 +9,8 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import CasinoIcon from '@mui/icons-material/Casino';
+import DiceRollDisplay from '../DiceRollDisplay';
 
 const CharacteristicsDialogItem = ({
   char,
@@ -25,7 +26,8 @@ const CharacteristicsDialogItem = ({
   specializations,
   onValueChange,
   onRoll,
-  onSpecializationChange
+  onSpecializationChange,
+  rolls
 }) => {
   return (
     <TableRow>
@@ -152,17 +154,26 @@ const CharacteristicsDialogItem = ({
         </Box>
       </TableCell>
       <TableCell align="center" sx={{ verticalAlign: 'top' }}>
-        <Box sx={{ pt: 0.5 }}>
+        <Box sx={{ pt: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
           {!isFixed && (
-            <Tooltip title="Slå 3T6">
-              <IconButton
-                size="small"
-                onClick={() => onRoll(char.key)}
-                color="primary"
-              >
-                <RefreshIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <>
+              <Tooltip title="Slå 3T6">
+                <IconButton
+                  size="small"
+                  onClick={() => onRoll(char.key)}
+                  color="primary"
+                >
+                  <CasinoIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              {rolls && (
+                <DiceRollDisplay 
+                  rolls={rolls} 
+                  diceType="T6" 
+                  size="small"
+                />
+              )}
+            </>
           )}
         </Box>
       </TableCell>
@@ -184,7 +195,8 @@ CharacteristicsDialogItem.propTypes = {
   specializations: PropTypes.object.isRequired,
   onValueChange: PropTypes.func.isRequired,
   onRoll: PropTypes.func.isRequired,
-  onSpecializationChange: PropTypes.func.isRequired
+  onSpecializationChange: PropTypes.func.isRequired,
+  rolls: PropTypes.array
 };
 
 export default CharacteristicsDialogItem;

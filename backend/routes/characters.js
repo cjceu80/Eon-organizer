@@ -111,7 +111,30 @@ async function enrichCharactersWithApparentAge(characters) {
 
 // Create a new character
 router.post('/', authenticateToken, asyncHandler(async (req, res) => {
-  const { name, worldId, bio, stats, inventory, bonuses } = req.body;
+  const { 
+    name, 
+    worldId, 
+    basics, 
+    attributes, 
+    characteristics, 
+    specializations,
+    advantages,
+    disadvantages,
+    meleeWeapons,
+    rangedWeapons,
+    armor,
+    shields,
+    inventory,
+    ownedItems,
+    professionalSkills,
+    otherSkills,
+    languages,
+    connections,
+    bio,
+    // Legacy fields for backward compatibility
+    stats,
+    bonuses
+  } = req.body;
 
   // Validation
   if (!name || !name.trim()) {
@@ -165,15 +188,31 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
     });
   }
 
-  // Create character
+  // Create character with new structure
   const character = new Character({
     name: name.trim(),
     world: worldId,
     owner: req.user.id,
-    bio: bio || '',
+    basics: basics || {},
+    attributes: attributes || {},
+    characteristics: characteristics || {},
+    specializations: specializations || {},
+    advantages: advantages || [],
+    disadvantages: disadvantages || [],
+    meleeWeapons: meleeWeapons || [],
+    rangedWeapons: rangedWeapons || [],
+    armor: armor || [],
+    shields: shields || [],
+    inventory: inventory || [],
+    ownedItems: ownedItems || [],
+    professionalSkills: professionalSkills || [],
+    otherSkills: otherSkills || [],
+    languages: languages || [],
+    connections: connections || [],
+    bio: bio || [],
+    // Legacy fields for backward compatibility
     stats: stats || {},
     bonuses: bonuses || {},
-    inventory: inventory || [],
     isActive: true
   });
 
@@ -229,13 +268,53 @@ router.get('/:characterId', authenticateToken, asyncHandler(async (req, res) => 
 
 // Update character (owner or world admin)
 router.put('/:characterId', authenticateToken, canModifyCharacter, asyncHandler(async (req, res) => {
-  const { name, bio, stats, inventory, isActive } = req.body;
+  const { 
+    name, 
+    basics,
+    attributes,
+    characteristics,
+    specializations,
+    advantages,
+    disadvantages,
+    meleeWeapons,
+    rangedWeapons,
+    armor,
+    shields,
+    inventory,
+    ownedItems,
+    professionalSkills,
+    otherSkills,
+    languages,
+    connections,
+    bio,
+    // Legacy fields
+    stats,
+    bonuses,
+    isActive 
+  } = req.body;
   
   const updateData = {};
   if (name !== undefined) updateData.name = name.trim();
-  if (bio !== undefined) updateData.bio = bio;
-  if (stats !== undefined) updateData.stats = stats;
+  if (basics !== undefined) updateData.basics = basics;
+  if (attributes !== undefined) updateData.attributes = attributes;
+  if (characteristics !== undefined) updateData.characteristics = characteristics;
+  if (specializations !== undefined) updateData.specializations = specializations;
+  if (advantages !== undefined) updateData.advantages = advantages;
+  if (disadvantages !== undefined) updateData.disadvantages = disadvantages;
+  if (meleeWeapons !== undefined) updateData.meleeWeapons = meleeWeapons;
+  if (rangedWeapons !== undefined) updateData.rangedWeapons = rangedWeapons;
+  if (armor !== undefined) updateData.armor = armor;
+  if (shields !== undefined) updateData.shields = shields;
   if (inventory !== undefined) updateData.inventory = inventory;
+  if (ownedItems !== undefined) updateData.ownedItems = ownedItems;
+  if (professionalSkills !== undefined) updateData.professionalSkills = professionalSkills;
+  if (otherSkills !== undefined) updateData.otherSkills = otherSkills;
+  if (languages !== undefined) updateData.languages = languages;
+  if (connections !== undefined) updateData.connections = connections;
+  if (bio !== undefined) updateData.bio = bio;
+  // Legacy fields
+  if (stats !== undefined) updateData.stats = stats;
+  if (bonuses !== undefined) updateData.bonuses = bonuses;
   if (isActive !== undefined) updateData.isActive = isActive;
 
   const character = await Character.findByIdAndUpdate(
