@@ -68,9 +68,9 @@ export default function RollTableCard({
               variant="outlined"
               startIcon={<CasinoIcon />}
               onClick={onReroll}
-              disabled={disabled || rerolls <= 0}
+              disabled={disabled}
             >
-              {rerolls > 0 ? `Slå om (${rerolls} kvar)` : 'Slå om'}
+              Slå om
             </Button>
           ) : (
             <Button

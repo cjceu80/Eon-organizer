@@ -122,18 +122,38 @@ export default function AgeCalculationDialog({
   const [remainingRerolls, setRemainingRerolls] = useState(rerolls);
   const [initialRoll, setInitialRoll] = useState(false);
 
-  // Load saved state or initialize
+  // Track if saved state has been loaded to prevent re-loading
+  const savedStateLoadedRef = useRef(false);
+  
+  // Track if we're currently loading saved state to prevent saving during load
+  const isLoadingSavedStateRef = useRef(false);
+
+  // Load saved state (only once when dialog opens with saved state)
   useEffect(() => {
-    if (savedState) {
+    if (savedState && !savedStateLoadedRef.current) {
+      isLoadingSavedStateRef.current = true;
+      
       // Restore from saved state
       if (savedState.ageResult) setAgeResult(savedState.ageResult);
       if (savedState.kroppsbyggnadResult) setKroppsbyggnadResult(savedState.kroppsbyggnadResult);
       if (savedState.lengthResult) setLengthResult(savedState.lengthResult);
       if (savedState.remainingRerolls !== undefined) setRemainingRerolls(savedState.remainingRerolls);
+      
+      savedStateLoadedRef.current = true;
       setInitialRoll(true);
-    } else if (!initialRoll) {
+      
+      // Allow state saving after a brief delay to ensure all state updates are complete
+      setTimeout(() => {
+        isLoadingSavedStateRef.current = false;
+      }, 100);
+    } else if (!savedState && !initialRoll) {
       // No saved state, initialize but don't roll
       setInitialRoll(true);
+    }
+    // Reset flag when dialog closes (savedState becomes null)
+    if (!savedState) {
+      savedStateLoadedRef.current = false;
+      isLoadingSavedStateRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedState, rerolls]);
@@ -145,6 +165,11 @@ export default function AgeCalculationDialog({
   }, [onStateChange]);
 
   useEffect(() => {
+    // Don't save state while we're loading saved state
+    if (isLoadingSavedStateRef.current) {
+      return;
+    }
+    
     if (initialRoll && onStateChangeRef.current) {
       const stateToSave = {
         ageCalculationState: {
@@ -328,23 +353,29 @@ export default function AgeCalculationDialog({
   };
 
   const handleRerollAge = () => {
-    if (remainingRerolls <= 0) return;
     handleRollAge();
-    setRemainingRerolls(prev => prev - 1);
+    // Only consume reroll token if available
+    if (remainingRerolls > 0) {
+      setRemainingRerolls(prev => prev - 1);
+    }
   };
 
   const handleRerollKroppsbyggnad = () => {
-    if (remainingRerolls <= 0) return;
     // This will also recalculate length since they share the same 3T6
     handleRollKroppsbyggnad();
-    setRemainingRerolls(prev => prev - 1);
+    // Only consume reroll token if available
+    if (remainingRerolls > 0) {
+      setRemainingRerolls(prev => prev - 1);
+    }
   };
 
   const handleRerollLength = () => {
-    if (remainingRerolls <= 0) return;
     // Reroll both kroppsbyggnad and length together since they share the same 3T6
     handleRollKroppsbyggnad();
-    setRemainingRerolls(prev => prev - 1);
+    // Only consume reroll token if available
+    if (remainingRerolls > 0) {
+      setRemainingRerolls(prev => prev - 1);
+    }
   };
 
   const handleConfirm = () => {
@@ -383,7 +414,14 @@ export default function AgeCalculationDialog({
   };
 
   // Initialize empty results if they don't exist (only once on mount or when attributes change)
+  // But don't initialize if we're loading saved state or if saved state has been loaded
   useEffect(() => {
+    // Don't initialize if we have saved state or if we're currently loading saved state
+    if (savedState || isLoadingSavedStateRef.current || savedStateLoadedRef.current) {
+      return;
+    }
+    
+    // Only initialize if the result is completely null/undefined
     if (!ageResult) {
       setAgeResult({
         bil: attributes?.BIL || 0,
@@ -420,7 +458,7 @@ export default function AgeCalculationDialog({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attributes?.BIL, attributes?.STY, attributes?.TÅL]);
+  }, [attributes?.BIL, attributes?.STY, attributes?.TÅL, savedState]);
   
   // Use state values or provide defaults for display
   const displayAgeResult = ageResult || {
@@ -498,17 +536,15 @@ export default function AgeCalculationDialog({
                           Slå
                         </Button>
                       ) : (
-                        remainingRerolls > 0 && (
-                          <Tooltip title={`Återkasta Ob3T6 (${remainingRerolls} kvar)`}>
-                            <IconButton 
-                              size="small" 
-                              onClick={handleRerollAge}
-                              color="primary"
-                            >
-                              <RefreshIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )
+                        <Tooltip title={remainingRerolls > 0 ? `Återkasta Ob3T6 (${remainingRerolls} kvar)` : 'Återkasta Ob3T6'}>
+                          <IconButton 
+                            size="small" 
+                            onClick={handleRerollAge}
+                            color="primary"
+                          >
+                            <RefreshIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Box>
                     {displayAgeResult.ob3T6 ? (
@@ -646,17 +682,15 @@ export default function AgeCalculationDialog({
                           Slå
                         </Button>
                       ) : (
-                        remainingRerolls > 0 && (
-                          <Tooltip title={`Återkasta 3T6 (${remainingRerolls} kvar)`}>
-                            <IconButton 
-                              size="small" 
-                              onClick={handleRerollKroppsbyggnad}
-                              color="primary"
-                            >
-                              <RefreshIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )
+                        <Tooltip title={remainingRerolls > 0 ? `Återkasta 3T6 (${remainingRerolls} kvar)` : 'Återkasta 3T6'}>
+                          <IconButton 
+                            size="small" 
+                            onClick={handleRerollKroppsbyggnad}
+                            color="primary"
+                          >
+                            <RefreshIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Box>
                     {displayKroppsbyggnadResult.t6Rolls ? (
@@ -791,17 +825,15 @@ export default function AgeCalculationDialog({
                           Slå
                         </Button>
                       ) : (
-                        remainingRerolls > 0 && (
-                          <Tooltip title={`Återkasta 3T6 (${remainingRerolls} kvar)`}>
-                            <IconButton 
-                              size="small" 
-                              onClick={handleRerollLength}
-                              color="primary"
-                            >
-                              <RefreshIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )
+                        <Tooltip title={remainingRerolls > 0 ? `Återkasta 3T6 (${remainingRerolls} kvar)` : 'Återkasta 3T6'}>
+                          <IconButton 
+                            size="small" 
+                            onClick={handleRerollLength}
+                            color="primary"
+                          >
+                            <RefreshIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Box>
                     {displayLengthResult.t6Rolls ? (

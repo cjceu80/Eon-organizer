@@ -115,7 +115,7 @@ export default function RollTableView({
   onRoll,
   onReroll = null,
   onMinimize,
-  rerolls = 0,
+  rerolls = 0, // eslint-disable-line no-unused-vars
   freeChoiceTokens = 0,
   onPendingFreeChoiceChange = null,
   disabled = false,
@@ -170,7 +170,7 @@ export default function RollTableView({
   };
 
   const handleReroll = async () => {
-    if (disabled || loading || rerolls <= 0) return;
+    if (disabled || loading) return;
     
     if (onReroll) {
       await onReroll();
@@ -282,14 +282,14 @@ export default function RollTableView({
               </Button>
             ) : (
               <>
-                {((rerolls > 0) || isFreeReroll) && !freeChoiceMode && (
+                {!freeChoiceMode && (
                   <Button
                     variant={isFreeReroll ? "contained" : "outlined"}
                     startIcon={<RefreshIcon />}
                     onClick={handleReroll}
                     disabled={disabled || loading}
                   >
-                    {isFreeReroll ? 'Slå om' : `Slå om (${rerolls} kvar)`}
+                    Slå om
                   </Button>
                 )}
                 

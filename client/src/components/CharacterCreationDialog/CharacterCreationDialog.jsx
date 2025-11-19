@@ -24,7 +24,14 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  IconButton
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -32,7 +39,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CasinoIcon from '@mui/icons-material/Casino';
 import RaceSelectionDialog from './RaceSelectionDialog';
 import AgeCalculationDialog from './AgeCalculationDialog';
-import CharacteristicsDialog from './CharacteristicsDialog';
+import CharacteristicsDialogItem from './CharacteristicsDialogItem';
 import BirthDialog from './BirthDialog';
 import FamilyDialog from './FamilyDialog';
 import DiceRollDisplay from '../DiceRollDisplay';
@@ -68,17 +75,7 @@ export default function CharacterCreationDialog({
     build: ''
   });
   
-  const [attributes, setAttributes] = useState({
-    STY: 10,
-    TÅL: 10,
-    RÖR: 10,
-    PER: 10,
-    PSY: 10,
-    VIL: 10,
-    BIL: 10,
-    SYN: 10,
-    HÖR: 10
-  });
+  const [attributes, setAttributes] = useState({});
   
   // Store dice rolls for each attribute
   const [attributeRolls, setAttributeRolls] = useState({});
@@ -88,20 +85,95 @@ export default function CharacterCreationDialog({
   const [selectedAnpassadSet, setSelectedAnpassadSet] = useState(null);
   const [dragOverAttribute, setDragOverAttribute] = useState(null);
   
-  const [characteristics, setCharacteristics] = useState({
-    Lojalitet: 10,
-    Heder: 10,
-    Amor: 10,
-    Aggression: 10,
-    Tro: 10,
-    Generositet: 10,
-    Rykte: 10,
-    Tur: 10,
-    Qadosh: 10
-  });
+  const [characteristics, setCharacteristics] = useState({});
   
   // Store dice rolls for each characteristic
   const [characteristicRolls, setCharacteristicRolls] = useState({});
+  
+  // Characteristics data from JSON
+  const [characteristicsData, setCharacteristicsData] = useState(null);
+  const [characteristicsLoading, setCharacteristicsLoading] = useState(true);
+  
+  // Characteristics constants
+  const CHARACTERISTICS = [
+    { key: 'Lojalitet', fixed: false },
+    { key: 'Heder', fixed: false },
+    { key: 'Amor', fixed: false },
+    { key: 'Aggression', fixed: false },
+    { key: 'Tro', fixed: false },
+    { key: 'Generositet', fixed: false },
+    { key: 'Rykte', fixed: true, value: 5 },
+    { key: 'Tur', fixed: true, value: 11 },
+    { key: 'Qadosh', fixed: false }
+  ];
+  
+  // Helper to match characteristic by full name or first 3 characters
+  const matchesCharacteristic = (charKey, recommendation) => {
+    const charLower = charKey.toLowerCase();
+    const recLower = recommendation.toLowerCase();
+    return charLower === recLower || charLower.substring(0, 3) === recLower.substring(0, 3);
+  };
+  
+  // Data collected from optional tools (declared early so it can be used in useEffect)
+  const [selectedRace, setSelectedRace] = useState(null);
+  
+  // Load characteristics data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const response = await fetch('/copyrighted/characteristics.json');
+        if (response.ok) {
+          const data = await response.json();
+          setCharacteristicsData(data);
+        } else {
+          console.error('Failed to load characteristics data');
+          setCharacteristicsData({
+            descriptions: {},
+            highSpecializationExamples: {},
+            lowSpecializationExamples: {}
+          });
+        }
+    } catch (err) {
+        console.error('Error loading characteristics data:', err);
+        setCharacteristicsData({
+          descriptions: {},
+          highSpecializationExamples: {},
+          lowSpecializationExamples: {}
+        });
+      } finally {
+        setCharacteristicsLoading(false);
+      }
+    };
+    
+    loadData();
+  }, []);
+  
+  // Initialize characteristics with race recommendations
+  useEffect(() => {
+    if (selectedRace && !characteristicsLoading && Object.keys(characteristics).length === 0) {
+      const highCharacteristics = selectedRace?.metadata?.highCharacteristics || [];
+      const lowCharacteristics = selectedRace?.metadata?.lowCharacteristics || [];
+      
+      const initial = {};
+      CHARACTERISTICS.forEach(char => {
+        if (char.fixed) {
+          initial[char.key] = char.value;
+        } else {
+          const isHigh = highCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+          const isLow = lowCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+          
+          if (isHigh) {
+            initial[char.key] = 13;
+          } else if (isLow) {
+            initial[char.key] = 8;
+          } else {
+            initial[char.key] = 11;
+          }
+        }
+      });
+      setCharacteristics(initial);
+    }
+  }, [selectedRace, characteristicsLoading, characteristics]);
   
   const [specializations, setSpecializations] = useState({});
   const [professionalSkills, setProfessionalSkills] = useState([]);
@@ -113,17 +185,18 @@ export default function CharacterCreationDialog({
   // Optional tool dialogs
   const [showRaceSelectionDialog, setShowRaceSelectionDialog] = useState(false);
   const [showAgeCalculationDialog, setShowAgeCalculationDialog] = useState(false);
-  const [showCharacteristicsDialog, setShowCharacteristicsDialog] = useState(false);
   const [showBirthDialog, setShowBirthDialog] = useState(false);
   const [showFamilyDialog, setShowFamilyDialog] = useState(false);
-
-  // Data collected from optional tools
-  const [selectedRace, setSelectedRace] = useState(null);
   const [ageData, setAgeData] = useState(null);
   const [backgroundData, setBackgroundData] = useState(null);
   const [familyData, setFamilyData] = useState(null);
   const [raceCategory, setRaceCategory] = useState(null);
   const [gender, setGender] = useState('');
+
+  // State storage for dialogs (to persist when reopening)
+  const [ageCalculationDialogState, setAgeCalculationDialogState] = useState(null);
+  const [birthDialogState, setBirthDialogState] = useState(null);
+  const [familyDialogState, setFamilyDialogState] = useState(null);
 
   // Fetch race category when race is selected
   const fetchRaceCategory = async (race) => {
@@ -153,52 +226,7 @@ export default function CharacterCreationDialog({
     setSelectedRace(race);
     setShowRaceSelectionDialog(false);
     await fetchRaceCategory(race);
-    
-    // Update default attributes (10) to include race modifiers
-    if (race?.modifiers) {
-      const modifiers = race.modifiers instanceof Map 
-        ? Object.fromEntries(race.modifiers)
-        : race.modifiers;
-      
-      setAttributes(prev => {
-        const updated = { ...prev };
-        Object.keys(updated).forEach(attr => {
-          // Only update if still at default value of 10
-          if (prev[attr] === 10) {
-            const modifier = modifiers[attr] || 0;
-            updated[attr] = 10 + modifier;
-          }
-        });
-        return updated;
-      });
-    }
   };
-  
-  // Update attributes when race changes (if attributes are still at defaults)
-  useEffect(() => {
-    if (selectedRace?.modifiers) {
-      const modifiers = selectedRace.modifiers instanceof Map 
-        ? Object.fromEntries(selectedRace.modifiers)
-        : selectedRace.modifiers;
-      
-      setAttributes(prev => {
-        const updated = { ...prev };
-        let hasChanges = false;
-        Object.keys(updated).forEach(attr => {
-          // Only update if still at default value of 10
-          if (prev[attr] === 10) {
-            const modifier = modifiers[attr] || 0;
-            const newValue = 10 + modifier;
-            if (newValue !== prev[attr]) {
-              updated[attr] = newValue;
-              hasChanges = true;
-            }
-          }
-        });
-        return hasChanges ? updated : prev;
-      });
-    }
-  }, [selectedRace]);
 
   const handleRollAttribute = (attr) => {
     const statRollMethod = world?.settings?.statRollMethod || 'standard';
@@ -228,11 +256,45 @@ export default function CharacterCreationDialog({
     setAttributeRolls(prev => ({ ...prev, [attr]: rolls }));
   };
   
-  const handleRollCharacteristic = (char) => {
+  const handleRollCharacteristic = (charKey) => {
     const rolls = rollT6Multiple(3);
     const total = rolls.reduce((a, b) => a + b, 0);
-    setCharacteristics(prev => ({ ...prev, [char]: total }));
-    setCharacteristicRolls(prev => ({ ...prev, [char]: rolls }));
+    setCharacteristics(prev => ({ ...prev, [charKey]: total }));
+    setCharacteristicRolls(prev => ({ ...prev, [charKey]: rolls }));
+  };
+  
+  const handleCharacteristicValueChange = (charKey, value) => {
+    const numValue = parseInt(value, 10);
+    if (isNaN(numValue)) {
+      setCharacteristics(prev => ({ ...prev, [charKey]: '' }));
+      return;
+    }
+    const clampedValue = Math.max(3, Math.min(18, numValue));
+    setCharacteristics(prev => ({ ...prev, [charKey]: clampedValue }));
+  };
+  
+  const getCharacteristicValue = (charKey) => {
+    const char = CHARACTERISTICS.find(c => c.key === charKey);
+    if (char?.fixed) {
+      return char.value;
+    }
+    return characteristics[charKey] !== undefined && characteristics[charKey] !== '' 
+      ? characteristics[charKey] 
+      : 11;
+  };
+  
+  const hasHighSpecialization = (charKey) => {
+    const char = CHARACTERISTICS.find(c => c.key === charKey);
+    if (char?.fixed) return false;
+    const value = getCharacteristicValue(charKey);
+    return typeof value === 'number' && value >= 14;
+  };
+  
+  const hasLowSpecialization = (charKey) => {
+    const char = CHARACTERISTICS.find(c => c.key === charKey);
+    if (char?.fixed) return false;
+    const value = getCharacteristicValue(charKey);
+    return typeof value === 'number' && value <= 7;
   };
 
   const handleAgeCalculated = (ageDataResult) => {
@@ -258,19 +320,9 @@ export default function CharacterCreationDialog({
           ageDataResult.kroppsbyggnadRollDetails.t6Rolls.reduce((a, b) => a + b, 0) : null
       }));
     }
-    setShowAgeCalculationDialog(false);
+      setShowAgeCalculationDialog(false);
   };
 
-  const handleCharacteristicsConfirmed = (characteristicsResult) => {
-    // Automatically transfer characteristics to form
-    if (characteristicsResult?.characteristics) {
-      setCharacteristics(characteristicsResult.characteristics);
-    }
-    if (characteristicsResult?.specializations) {
-      setSpecializations(characteristicsResult.specializations);
-    }
-    setShowCharacteristicsDialog(false);
-  };
 
   const handleBackgroundConfirmed = async (backgroundResult) => {
     setBackgroundData(backgroundResult);
@@ -356,8 +408,11 @@ export default function CharacterCreationDialog({
           : selectedRace.modifiers;
         
         Object.keys(finalAttributes).forEach(attr => {
-          const modifier = modifiers[attr] || 0;
-          finalAttributes[attr] = (finalAttributes[attr] || 10) + modifier;
+          const baseValue = finalAttributes[attr];
+          if (baseValue !== undefined && baseValue !== null && typeof baseValue === 'number') {
+            const modifier = modifiers[attr] || 0;
+            finalAttributes[attr] = baseValue + modifier;
+          }
         });
       }
       
@@ -426,7 +481,12 @@ export default function CharacterCreationDialog({
   };
 
   const handleClose = () => {
-    // Reset form when closing
+    // Just close the dialog without resetting
+    onClose();
+  };
+
+  const handleCancel = () => {
+    // Reset form when cancel button is pressed
     setCharacterName('');
     setBasics({
       profession: '',
@@ -437,36 +497,19 @@ export default function CharacterCreationDialog({
       religion: '',
       build: ''
     });
-    setAttributes({
-      STY: 10,
-      TÅL: 10,
-      RÖR: 10,
-      PER: 10,
-      PSY: 10,
-      VIL: 10,
-      BIL: 10,
-      SYN: 10,
-      HÖR: 10
-    });
-    setCharacteristics({
-      Lojalitet: 10,
-      Heder: 10,
-      Amor: 10,
-      Aggression: 10,
-      Tro: 10,
-      Generositet: 10,
-      Rykte: 10,
-      Tur: 10,
-      Qadosh: 10
-    });
+    setAttributes({});
+    setAttributeRolls({});
+    setAnpassadSets([]);
+    setSelectedAnpassadSet(null);
+    setDragOverAttribute(null);
+    setCharacteristics({});
+    setCharacteristicRolls({});
     setSpecializations({});
     setProfessionalSkills([]);
     setOtherSkills([]);
     setLanguages([]);
     setConnections([]);
     setBio('');
-    setAttributeRolls({});
-    setCharacteristicRolls({});
     setSelectedRace(null);
     setAgeData(null);
     setBackgroundData(null);
@@ -474,6 +517,18 @@ export default function CharacterCreationDialog({
     setRaceCategory(null);
     setGender('');
     setActiveTab(0);
+    
+    // Reset dialog states
+    setShowRaceSelectionDialog(false);
+    setShowAgeCalculationDialog(false);
+    setShowBirthDialog(false);
+    setShowFamilyDialog(false);
+    
+    // Reset dialog saved states
+    setAgeCalculationDialogState(null);
+    setBirthDialogState(null);
+    setFamilyDialogState(null);
+    
     onClose();
   };
 
@@ -485,7 +540,7 @@ export default function CharacterCreationDialog({
       <Dialog open={open} onClose={handleClose} maxWidth="xl" fullWidth>
         <form onSubmit={handleCreateCharacter}>
           <DialogTitle>Skapa ny karaktär</DialogTitle>
-          <DialogContent>
+        <DialogContent>
             <Box
               sx={{
                 display: 'flex',
@@ -536,8 +591,17 @@ export default function CharacterCreationDialog({
                         label="Ras"
                         fullWidth
                         value={selectedRace?.name || ''}
-                        InputProps={{ readOnly: true }}
-                        helperText={selectedRace ? 'Använd verktyget för att ändra' : 'Använd verktyget för att välja'}
+                        onClick={() => {
+                          setShowRaceSelectionDialog(true);
+                          setActiveTab(0);
+                        }}
+                        onChange={() => {}}
+                        disabled={creating}
+                        helperText="Klicka för att välja ras"
+                        InputProps={{
+                          readOnly: true,
+                          sx: { cursor: 'pointer' }
+                        }}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -548,7 +612,15 @@ export default function CharacterCreationDialog({
                         value={gender || ageData?.gender || ''}
                         onChange={(e) => setGender(e.target.value)}
                         disabled={creating}
+                        inputProps={{
+                          list: 'gender-options'
+                        }}
                       />
+                      <datalist id="gender-options">
+                        <option value="Man" />
+                        <option value="Kvinna" />
+                        <option value="Obestämt" />
+                      </datalist>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <TextField
@@ -679,11 +751,28 @@ export default function CharacterCreationDialog({
                 </TabPanel>
 
                 <TabPanel value={activeTab} index={1}>
-                  <Alert severity="info" sx={{ mb: 2 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
                     {world?.settings?.statRollMethod === 'anpassad' 
                       ? 'Dra och släpp värden från kortet nedan till attributen, eller klicka på "Välj" för ett attribut och sedan på ett värde. Använd "Rulla alla" för att rulla 9 värden på en gång.'
-                      : 'Klicka på tärningsikonen för att rulla attribut, eller ange manuellt.'}
-                  </Alert>
+                      : 'Klicka på tärningsikonen för att rulla attribut, eller använd "Rulla alla" för att rulla alla attribut på en gång.'}
+          </Alert>
+                  {world?.settings?.statRollMethod !== 'anpassad' && (
+                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button
+                        variant="outlined"
+                        startIcon={<CasinoIcon />}
+                        onClick={() => {
+                          const allAttributes = ['STY', 'TÅL', 'RÖR', 'PER', 'PSY', 'VIL', 'BIL', 'SYN', 'HÖR'];
+                          allAttributes.forEach(attr => {
+                            handleRollAttribute(attr);
+                          });
+                        }}
+                        disabled={creating}
+                      >
+                        Rulla alla
+          </Button>
+                    </Box>
+                  )}
                   <Grid container spacing={2}>
                     {['STY', 'TÅL', 'RÖR', 'PER', 'PSY', 'VIL', 'BIL', 'SYN', 'HÖR'].map(attr => {
                       // Get race modifier
@@ -696,14 +785,11 @@ export default function CharacterCreationDialog({
                         }
                       }
                       
-                      // Get base value from state (defaults to 10 if not set)
+                      // Get base value from state
                       const storedValue = attributes[attr];
-                      const baseValue = storedValue !== undefined && storedValue !== null ? storedValue : 10;
-                      
-                      // If base is 10 (default) and we have modifiers, show 10 + modifier in the field
-                      // Otherwise show the base value
-                      const displayValue = (baseValue === 10 && raceModifier !== 0) ? 10 + raceModifier : baseValue;
-                      const finalValue = baseValue + raceModifier;
+                      const baseValue = storedValue !== undefined && storedValue !== null ? storedValue : '';
+                      const displayValue = baseValue;
+                      const finalValue = baseValue !== '' && baseValue !== null && baseValue !== undefined && typeof baseValue === 'number' ? baseValue + raceModifier : '';
 
   return (
                         <Grid item xs={12} sm={6} md={4} key={attr}>
@@ -736,7 +822,11 @@ export default function CharacterCreationDialog({
                                   if (draggedSet) {
                                     // Unassign from previous attribute if any
                                     if (draggedSet.assignedTo) {
-                                      setAttributes(prev => ({ ...prev, [draggedSet.assignedTo]: 10 }));
+                                      setAttributes(prev => {
+                                        const newAttrs = { ...prev };
+                                        delete newAttrs[draggedSet.assignedTo];
+                                        return newAttrs;
+                                      });
                                       setAttributeRolls(prev => {
                                         const newRolls = { ...prev };
                                         delete newRolls[draggedSet.assignedTo];
@@ -785,13 +875,8 @@ export default function CharacterCreationDialog({
                                 fullWidth
                                 value={displayValue}
                                 onChange={(e) => {
-                                  const newValue = parseInt(e.target.value) || 10;
-                                  // If we were showing 10 + modifier and user changes it, store base value
-                                  // Subtract the modifier to get the actual base
-                                  const baseToStore = (baseValue === 10 && raceModifier !== 0) 
-                                    ? newValue - raceModifier 
-                                    : newValue;
-                                  setAttributes(prev => ({ ...prev, [attr]: baseToStore }));
+                                  const newValue = e.target.value === '' ? undefined : parseInt(e.target.value);
+                                  setAttributes(prev => ({ ...prev, [attr]: newValue }));
                                 }}
                                 disabled={creating}
                               />
@@ -806,7 +891,11 @@ export default function CharacterCreationDialog({
                                       setAnpassadSets(prev => prev.map(s => 
                                         s.id === currentSet.id ? { ...s, assignedTo: null } : s
                                       ));
-                                      setAttributes(prev => ({ ...prev, [attr]: 10 }));
+                                      setAttributes(prev => {
+                                        const newAttrs = { ...prev };
+                                        delete newAttrs[attr];
+                                        return newAttrs;
+                                      });
                                       setAttributeRolls(prev => {
                                         const newRolls = { ...prev };
                                         delete newRolls[attr];
@@ -963,23 +1052,27 @@ export default function CharacterCreationDialog({
                                   }
                                   return null;
                                 })()}
-                                {raceModifier !== 0 && (
+                                {baseValue !== '' && baseValue !== null && baseValue !== undefined && typeof baseValue === 'number' && (
                                   <>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {raceModifier > 0 ? '+' : ''}{raceModifier}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">=</Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                                      {baseValue + raceModifier}
-                                    </Typography>
-                                  </>
-                                )}
-                                {raceModifier === 0 && (
-                                  <>
-                                    <Typography variant="caption" color="text.secondary">=</Typography>
-                                    <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                                      {baseValue}
-                                    </Typography>
+                                    {raceModifier !== 0 && (
+                                      <>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {raceModifier > 0 ? '+' : ''}{raceModifier}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">=</Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                                          {baseValue + raceModifier}
+                                        </Typography>
+                                      </>
+                                    )}
+                                    {raceModifier === 0 && (
+                                      <>
+                                        <Typography variant="caption" color="text.secondary">=</Typography>
+                                        <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                                          {baseValue}
+                                        </Typography>
+                                      </>
+                                    )}
                                   </>
                                 )}
                               </Box>
@@ -1088,7 +1181,11 @@ export default function CharacterCreationDialog({
                                         setAnpassadSets(prev => prev.map(s => 
                                           s.id === set.id ? { ...s, assignedTo: null } : s
                                         ));
-                                        setAttributes(prev => ({ ...prev, [set.assignedTo]: 10 }));
+                                        setAttributes(prev => {
+                                          const newAttrs = { ...prev };
+                                          delete newAttrs[set.assignedTo];
+                                          return newAttrs;
+                                        });
                                         setAttributeRolls(prev => {
                                           const newRolls = { ...prev };
                                           delete newRolls[set.assignedTo];
@@ -1138,71 +1235,148 @@ export default function CharacterCreationDialog({
                 </TabPanel>
 
                 <TabPanel value={activeTab} index={2}>
-          <Alert severity="info" sx={{ mb: 2 }}>
-                    Klicka på tärningsikonen för att rulla karaktärsdrag, eller ange manuellt.
-          </Alert>
-                  <Grid container spacing={2}>
-                    {['Lojalitet', 'Heder', 'Amor', 'Aggression', 'Tro', 'Generositet', 'Rykte', 'Tur', 'Qadosh'].map(char => (
-                      <Grid item xs={12} sm={6} key={char}>
-                        <Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <TextField
-                              label={char}
-                              type="number"
-                              fullWidth
-                              value={characteristics[char] || 10}
-                              onChange={(e) => setCharacteristics(prev => ({ ...prev, [char]: parseInt(e.target.value) || 10 }))}
-                              disabled={creating}
-                            />
-                            <IconButton
-                              onClick={() => handleRollCharacteristic(char)}
-                              disabled={creating}
-                              color="primary"
-                              sx={{ minWidth: 40 }}
-                            >
-                              <CasinoIcon />
-                            </IconButton>
-                          </Box>
-                          {characteristicRolls[char] && (
-                            <Box sx={{ mb: 1, ml: 1 }}>
-                              <DiceRollDisplay 
-                                rolls={characteristicRolls[char]} 
-                                diceType="T6" 
-                                size="small"
-                              />
-                            </Box>
-                          )}
-                          {specializations[char] && (
-                            <TextField
-                              label="Specialisering"
-                              fullWidth
-                              size="small"
-                              value={specializations[char]}
-                              onChange={(e) => {
-                                const newSpecs = { ...specializations };
-                                if (e.target.value) {
-                                  newSpecs[char] = e.target.value;
-                                } else {
-                                  delete newSpecs[char];
-                                }
-                                setSpecializations(newSpecs);
-                              }}
-                              disabled={creating}
-                            />
-                          )}
-                          {!specializations[char] && (
-                            <Button
-                              size="small"
-                              onClick={() => setSpecializations(prev => ({ ...prev, [char]: '' }))}
-                              disabled={creating}
-                            >
-                              Lägg till specialisering
-                            </Button>
-                          )}
-                        </Box>
+                  {characteristicsLoading ? (
+                    <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                      <Typography>Laddar...</Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <Alert severity="info" sx={{ mb: 3 }}>
+                        Rykte är satt till 5 och Tur är satt till 11. Du kan slå de andra värdena med 3T6 (3-18) eller ange dem manuellt. 
+                        Vid värde ≥14 kan du ange en hög specialisering och vid värde ≤7 kan du ange en låg specialisering. Klicka på ett exempel för att fylla i textfältet.
+                      </Alert>
+
+                      <Grid container spacing={3}>
+                        <Grid size={{ xs: 12, sm: 12 }}>
+                          <Grid container spacing={2}>
+                            {/* First column of characteristics */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                              <TableContainer component={Paper} variant="outlined">
+                                <Table>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell><strong>Karaktärsdrag</strong></TableCell>
+                                      <TableCell align="right"><strong>Värde</strong></TableCell>
+                                      <TableCell align="center"><strong>Åtgärder</strong></TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {CHARACTERISTICS.slice(0, Math.ceil(CHARACTERISTICS.length / 2)).map(char => {
+                                      const value = getCharacteristicValue(char.key);
+                                      const isFixed = char.fixed;
+                                      const description = characteristicsData?.descriptions?.[char.key] || '';
+                                      const showHighSpec = hasHighSpecialization(char.key);
+                                      const showLowSpec = hasLowSpecialization(char.key);
+                                      const highExamples = characteristicsData?.highSpecializationExamples?.[char.key] || [];
+                                      const lowExamples = characteristicsData?.lowSpecializationExamples?.[char.key] || [];
+                                      
+                                      const highCharacteristics = selectedRace?.metadata?.highCharacteristics || [];
+                                      const lowCharacteristics = selectedRace?.metadata?.lowCharacteristics || [];
+                                      const isHighRecommended = highCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+                                      const isLowRecommended = lowCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+
+                                      return (
+                                        <CharacteristicsDialogItem
+                                          key={char.key}
+                                          char={char}
+                                          value={value}
+                                          isFixed={isFixed}
+                                          description={description}
+                                          showHighSpec={showHighSpec}
+                                          showLowSpec={showLowSpec}
+                                          highExamples={highExamples}
+                                          lowExamples={lowExamples}
+                                          isHighRecommended={isHighRecommended}
+                                          isLowRecommended={isLowRecommended}
+                                          specializations={specializations}
+                                          onValueChange={handleCharacteristicValueChange}
+                                          onRoll={handleRollCharacteristic}
+                                          onSpecializationChange={(key, val) => {
+                                            setSpecializations(prev => {
+                                              const newSpecs = { ...prev };
+                                              if (val) {
+                                                newSpecs[key] = val;
+                                              } else {
+                                                delete newSpecs[key];
+                                              }
+                                              return newSpecs;
+                                            });
+                                          }}
+                                          rolls={characteristicRolls[char.key]}
+                                        />
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Grid>
+                            
+                            {/* Second column of characteristics */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                              <TableContainer component={Paper} variant="outlined">
+                                <Table>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell><strong>Karaktärsdrag</strong></TableCell>
+                                      <TableCell align="right"><strong>Värde</strong></TableCell>
+                                      <TableCell align="center"><strong>Åtgärder</strong></TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {CHARACTERISTICS.slice(Math.ceil(CHARACTERISTICS.length / 2)).map(char => {
+                                      const value = getCharacteristicValue(char.key);
+                                      const isFixed = char.fixed;
+                                      const description = characteristicsData?.descriptions?.[char.key] || '';
+                                      const showHighSpec = hasHighSpecialization(char.key);
+                                      const showLowSpec = hasLowSpecialization(char.key);
+                                      const highExamples = characteristicsData?.highSpecializationExamples?.[char.key] || [];
+                                      const lowExamples = characteristicsData?.lowSpecializationExamples?.[char.key] || [];
+                                      
+                                      const highCharacteristics = selectedRace?.metadata?.highCharacteristics || [];
+                                      const lowCharacteristics = selectedRace?.metadata?.lowCharacteristics || [];
+                                      const isHighRecommended = highCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+                                      const isLowRecommended = lowCharacteristics.some(rec => matchesCharacteristic(char.key, rec));
+
+                                      return (
+                                        <CharacteristicsDialogItem
+                                          key={char.key}
+                                          char={char}
+                                          value={value}
+                                          isFixed={isFixed}
+                                          description={description}
+                                          showHighSpec={showHighSpec}
+                                          showLowSpec={showLowSpec}
+                                          highExamples={highExamples}
+                                          lowExamples={lowExamples}
+                                          isHighRecommended={isHighRecommended}
+                                          isLowRecommended={isLowRecommended}
+                                          specializations={specializations}
+                                          onValueChange={handleCharacteristicValueChange}
+                                          onRoll={handleRollCharacteristic}
+                                          onSpecializationChange={(key, val) => {
+                                            setSpecializations(prev => {
+                                              const newSpecs = { ...prev };
+                                              if (val) {
+                                                newSpecs[key] = val;
+                                              } else {
+                                                delete newSpecs[key];
+                                              }
+                                              return newSpecs;
+                                            });
+                                          }}
+                                          rolls={characteristicRolls[char.key]}
+                                        />
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Grid>
+                          </Grid>
+                        </Grid>
                       </Grid>
-                    ))}
-                  </Grid>
+                    </>
+                  )}
                 </TabPanel>
 
                 <TabPanel value={activeTab} index={3}>
@@ -1318,7 +1492,7 @@ export default function CharacterCreationDialog({
                               </IconButton>
                             </Grid>
                           </Grid>
-                        </Box>
+              </Box>
                       ))}
                       <Button
                         variant="outlined"
@@ -1341,9 +1515,9 @@ export default function CharacterCreationDialog({
                         <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                           <Grid container spacing={2} alignItems="center">
                             <Grid item xs={12} sm={6}>
-                              <TextField
+            <TextField
                                 label="Språk"
-                                fullWidth
+              fullWidth
                                 size="small"
                                 value={lang.name}
                                 onChange={(e) => updateLanguage(index, 'name', e.target.value)}
@@ -1374,10 +1548,10 @@ export default function CharacterCreationDialog({
                         </Box>
                       ))}
                       <Button
-                        variant="outlined"
+              variant="outlined"
                         startIcon={<AddIcon />}
                         onClick={addLanguage}
-                        disabled={creating}
+              disabled={creating}
                         sx={{ mt: 2 }}
                       >
                         Lägg till språk
@@ -1401,9 +1575,9 @@ export default function CharacterCreationDialog({
                           />
                         </Grid>
                         <Grid item xs={12} sm={4}>
-                          <TextField
+            <TextField
                             label="Relation"
-                            fullWidth
+              fullWidth
                             size="small"
                             value={conn.relationship}
                             onChange={(e) => updateConnection(index, 'relationship', e.target.value)}
@@ -1433,7 +1607,7 @@ export default function CharacterCreationDialog({
                     </Box>
                   ))}
                   <Button
-                    variant="outlined"
+              variant="outlined"
                     startIcon={<AddIcon />}
                     onClick={addConnection}
                     disabled={creating}
@@ -1447,12 +1621,12 @@ export default function CharacterCreationDialog({
                   <TextField
                     label="Biografi"
                     fullWidth
-                    multiline
+              multiline
                     rows={10}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    disabled={creating}
-                  />
+              disabled={creating}
+            />
                 </TabPanel>
               </Box>
 
@@ -1461,7 +1635,7 @@ export default function CharacterCreationDialog({
                 <Divider orientation="vertical" flexItem />
               )}
 
-              {/* Right side: Tools (25% width on desktop) */}
+              {/* Right side: Guide (25% width on desktop) */}
               <Box
                 sx={{
                   width: { xs: '100%', md: '25%' },
@@ -1470,129 +1644,208 @@ export default function CharacterCreationDialog({
                 }}
               >
                 <Typography variant="h6" gutterBottom>
-                  Verktyg
-          </Typography>
+                  Guide
+                </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Använd dessa verktyg för att automatiskt fylla i formuläret.
+                  Stegvis guide för karaktärsskapande.
                 </Typography>
 
-                <Stack spacing={2}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="subtitle2" gutterBottom>
+                <Stack spacing={1}>
+                  {/* Step 1: Race Selection */}
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      cursor: 'pointer',
+                      opacity: selectedRace ? 1 : 0.7,
+                      '&:hover': { bgcolor: 'action.hover' }
+                    }}
+                    onClick={() => {
+                      setShowRaceSelectionDialog(true);
+                      setActiveTab(0);
+                    }}
+                  >
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        Steg 1
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium', mt: 0.5 }}>
                         Välj ras
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                         {selectedRace ? selectedRace.name : 'Ej vald'}
                       </Typography>
                     </CardContent>
-                    <CardActions>
-                      <Button 
-                        size="small" 
-                        onClick={() => setShowRaceSelectionDialog(true)}
-                        disabled={creating}
-                        fullWidth
-                      >
-                        {selectedRace ? 'Ändra' : 'Välj'}
-                      </Button>
-                    </CardActions>
                   </Card>
 
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Ålder & fysik
+                  {/* Step 2: Attributes */}
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: 'action.hover' }
+                    }}
+                    onClick={() => setActiveTab(1)}
+                  >
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        Steg 2
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        {ageData?.age ? `Ålder: ${ageData.age}` : 'Ej angivet'}
+                      <Typography variant="body2" sx={{ fontWeight: 'medium', mt: 0.5 }}>
+                        Attribut
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        {(() => {
+                          const allAttributes = ['STY', 'TÅL', 'RÖR', 'PER', 'PSY', 'VIL', 'BIL', 'SYN', 'HÖR'];
+                          const setCount = allAttributes.filter(attr => {
+                            const value = attributes[attr];
+                            return value !== undefined && value !== null;
+                          }).length;
+                          return setCount > 0 ? `${setCount}/9 angivna` : 'Ej angivna';
+                        })()}
                       </Typography>
                     </CardContent>
-                    <CardActions>
-                      <Button 
-                        size="small" 
-                        onClick={() => setShowAgeCalculationDialog(true)}
-                        disabled={creating || !attributes || attributes.STY === 10}
-                        fullWidth
-                      >
-                        Öppna
-                      </Button>
-                    </CardActions>
                   </Card>
 
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="subtitle2" gutterBottom>
+                  {/* Step 3: Age & Body - Enabled when attributes are set */}
+                  {(() => {
+                    const allAttributes = ['STY', 'TÅL', 'RÖR', 'PER', 'PSY', 'VIL', 'BIL', 'SYN', 'HÖR'];
+                    const attributesSet = allAttributes.some(attr => {
+                      const value = attributes[attr];
+                      return value !== undefined && value !== null && value !== 10;
+                    });
+                    const isEnabled = attributesSet;
+                    
+                    return (
+                      <Card 
+                        variant="outlined" 
+                        sx={{ 
+                          cursor: isEnabled ? 'pointer' : 'not-allowed',
+                          opacity: isEnabled ? 1 : 0.5,
+                          '&:hover': isEnabled ? { bgcolor: 'action.hover' } : {}
+                        }}
+                        onClick={() => {
+                          if (isEnabled) {
+                            setShowAgeCalculationDialog(true);
+                            setActiveTab(0);
+                          }
+                        }}
+                      >
+                        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            Steg 3 {!isEnabled && '(Låst)'}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 'medium', mt: 0.5 }}>
+                            Ålder & fysik
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            {ageData?.age ? `Ålder: ${ageData.age}` : 'Ej angivet'}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
+
+                  {/* Step 4: Characteristics */}
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      cursor: selectedRace ? 'pointer' : 'not-allowed',
+                      opacity: selectedRace ? 1 : 0.5,
+                      '&:hover': selectedRace ? { bgcolor: 'action.hover' } : {}
+                    }}
+                    onClick={() => {
+                      if (selectedRace) {
+                        setActiveTab(2);
+                      }
+                    }}
+                  >
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        Steg 4 {!selectedRace && '(Låst)'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium', mt: 0.5 }}>
                         Karaktärsdrag
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                         {characteristics.Lojalitet !== 10 ? 'Angivna' : 'Ej angivna'}
                       </Typography>
                     </CardContent>
-                    <CardActions>
-                      <Button 
-                        size="small" 
-                        onClick={() => setShowCharacteristicsDialog(true)}
-                        disabled={creating || !selectedRace}
-                        fullWidth
-                      >
-                        Öppna
-                      </Button>
-                    </CardActions>
                   </Card>
 
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="subtitle2" gutterBottom>
+                  {/* Step 5: Background */}
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      cursor: ageData ? 'pointer' : 'not-allowed',
+                      opacity: ageData ? 1 : 0.5,
+                      '&:hover': ageData ? { bgcolor: 'action.hover' } : {}
+                    }}
+                    onClick={() => {
+                      if (ageData) {
+                        setShowBirthDialog(true);
+                        setActiveTab(0);
+                      }
+                    }}
+                  >
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        Steg 5 {!ageData && '(Låst)'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium', mt: 0.5 }}>
                         Bakgrund
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                         {backgroundData ? 'Angiven' : 'Ej angiven'}
                       </Typography>
                     </CardContent>
-                    <CardActions>
-                      <Button 
-                        size="small" 
-                        onClick={() => setShowBirthDialog(true)}
-                        disabled={creating || !ageData}
-                        fullWidth
-                      >
-                        Öppna
-                      </Button>
-                    </CardActions>
                   </Card>
 
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Familj
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        {familyData ? 'Angiven' : 'Ej angiven'}
-                      </Typography>
-                    </CardContent>
-                    <CardActions>
-                      <Button 
-                        size="small" 
-                        onClick={() => setShowFamilyDialog(true)}
-                        disabled={creating || !backgroundData}
-                        fullWidth
+                  {/* Step 6: Family - Enabled when age & body are done */}
+                  {(() => {
+                    const ageAndBodyDone = ageData && ageData.age && ageData.length;
+                    const isEnabled = ageAndBodyDone;
+                    
+                    return (
+                      <Card 
+                        variant="outlined" 
+                        sx={{ 
+                          cursor: isEnabled ? 'pointer' : 'not-allowed',
+                          opacity: isEnabled ? 1 : 0.5,
+                          '&:hover': isEnabled ? { bgcolor: 'action.hover' } : {}
+                        }}
+                        onClick={() => {
+                          if (isEnabled) {
+                            setShowFamilyDialog(true);
+                            setActiveTab(0);
+                          }
+                        }}
                       >
-                        Öppna
-                      </Button>
-                    </CardActions>
-                  </Card>
+                        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            Steg 6 {!isEnabled && '(Låst)'}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 'medium', mt: 0.5 }}>
+                            Familj
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            {familyData ? 'Angiven' : 'Ej angiven'}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
                 </Stack>
               </Box>
             </Box>
-        </DialogContent>
-        <DialogActions>
-            <Button onClick={handleClose} disabled={creating}>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCancel} disabled={creating}>
               Avbryt
-          </Button>
+            </Button>
             <Button type="submit" variant="contained" disabled={creating || !characterName.trim()}>
               {creating ? 'Skapar...' : 'Skapa karaktär'}
-          </Button>
-        </DialogActions>
+            </Button>
+          </DialogActions>
         </form>
       </Dialog>
 
@@ -1616,23 +1869,20 @@ export default function CharacterCreationDialog({
           raceCategory={raceCategory}
           gender={gender || 'man'}
           varierandeVikt={world?.settings?.varierandeVikt !== undefined ? world?.settings?.varierandeVikt : true}
+          savedState={ageCalculationDialogState?.ageCalculationState || null}
+          onStateChange={(state) => setAgeCalculationDialogState(state)}
         />
       </Dialog>
 
-      <Dialog open={showCharacteristicsDialog} onClose={() => setShowCharacteristicsDialog(false)} maxWidth="md" fullWidth>
-        <CharacteristicsDialog
-          onClose={() => setShowCharacteristicsDialog(false)}
-          onConfirm={handleCharacteristicsConfirmed}
-          selectedRace={selectedRace}
-        />
-      </Dialog>
 
-      <Dialog open={showBirthDialog} onClose={() => setShowBirthDialog(false)} maxWidth="md" fullWidth>
+      <Dialog open={showBirthDialog} onClose={() => setShowBirthDialog(false)} maxWidth="lg" fullWidth>
         <BirthDialog
           onClose={() => setShowBirthDialog(false)}
           onConfirm={handleBackgroundConfirmed}
           worldSettings={world?.settings || {}}
           ageData={ageData}
+          savedState={birthDialogState?.birthState || null}
+          onStateChange={(state) => setBirthDialogState(state)}
         />
       </Dialog>
 
@@ -1645,6 +1895,8 @@ export default function CharacterCreationDialog({
           raceCategory={raceCategory}
           rerolls={0}
           freeSelections={world?.settings?.freeSelections || 0}
+          savedState={familyDialogState?.familyState || null}
+          onStateChange={(state) => setFamilyDialogState(state)}
         />
     </Dialog>
     </>

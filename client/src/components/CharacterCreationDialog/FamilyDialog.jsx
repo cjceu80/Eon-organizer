@@ -396,10 +396,8 @@ export default function FamilyDialog({
   const [familyTableLoading, setFamilyTableLoading] = useState(false);
   const [familyTableRollResult, setFamilyTableRollResult] = useState(null);
   const [showFamilyTableView, setShowFamilyTableView] = useState(false);
-  const [pendingFamilyTableFreeChoice, setPendingFamilyTableFreeChoice] = useState(null);
   const [familyTableSecondaryRollResult, setFamilyTableSecondaryRollResult] = useState(null);
   const [showFamilyTableSecondaryView, setShowFamilyTableSecondaryView] = useState(false);
-  const [pendingFamilyTableSecondaryFreeChoice, setPendingFamilyTableSecondaryFreeChoice] = useState(null);
   const [familyTableFreeRerollUsed, setFamilyTableFreeRerollUsed] = useState(false);
 
   // Get sibling formula from race metadata first, then race category, then defaults
@@ -540,7 +538,7 @@ export default function FamilyDialog({
     fetchFamilyTable();
   }, [token]);
 
-  // Load saved state or initialize rolling
+  // Load saved state (no automatic rolling)
   useEffect(() => {
     if (savedState) {
       // Restore from saved state
@@ -559,11 +557,14 @@ export default function FamilyDialog({
       if (savedState.olderRerollUsed !== undefined) setOlderRerollUsed(savedState.olderRerollUsed);
       if (savedState.youngerRerollUsed !== undefined) setYoungerRerollUsed(savedState.youngerRerollUsed);
       if (savedState.parentRerollUsed !== undefined) setParentRerollUsed(savedState.parentRerollUsed);
+      if (savedState.familyTableRollResult) setFamilyTableRollResult(savedState.familyTableRollResult);
+      if (savedState.familyTableSecondaryRollResult) setFamilyTableSecondaryRollResult(savedState.familyTableSecondaryRollResult);
+      if (savedState.showFamilyTableView !== undefined) setShowFamilyTableView(savedState.showFamilyTableView);
+      if (savedState.showFamilyTableSecondaryView !== undefined) setShowFamilyTableSecondaryView(savedState.showFamilyTableSecondaryView);
+      if (savedState.familyTableFreeRerollUsed !== undefined) setFamilyTableFreeRerollUsed(savedState.familyTableFreeRerollUsed);
       setInitialRoll(true);
     } else if (!initialRoll) {
-      // No saved state, do initial rolls
-      handleRollSiblings();
-      handleRollParents();
+      // No saved state, initialize but don't roll - user must press roll buttons
       setInitialRoll(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -593,12 +594,17 @@ export default function FamilyDialog({
           remainingFreeSelections,
           olderRerollUsed,
           youngerRerollUsed,
-          parentRerollUsed
+          parentRerollUsed,
+          familyTableRollResult,
+          familyTableSecondaryRollResult,
+          showFamilyTableView,
+          showFamilyTableSecondaryView,
+          familyTableFreeRerollUsed
         }
       };
       onStateChangeRef.current(stateToSave);
     }
-  }, [siblings, olderLittersRoll, youngerLittersRoll, olderLitters, youngerLitters, rollResult, parentStatus, rollDetails, motherAgeResult, fatherAgeResult, remainingRerolls, remainingFreeSelections, olderRerollUsed, youngerRerollUsed, parentRerollUsed, initialRoll]);
+  }, [siblings, olderLittersRoll, youngerLittersRoll, olderLitters, youngerLitters, rollResult, parentStatus, rollDetails, motherAgeResult, fatherAgeResult, remainingRerolls, remainingFreeSelections, olderRerollUsed, youngerRerollUsed, parentRerollUsed, familyTableRollResult, familyTableSecondaryRollResult, showFamilyTableView, showFamilyTableSecondaryView, familyTableFreeRerollUsed, initialRoll]);
 
   // Helper function to roll and calculate litters (extracted for reuse)
   const rollLittersHelper = (litterFormula, characterAge) => {
@@ -683,7 +689,7 @@ export default function FamilyDialog({
     return { calculatedLitters, littersRollData };
   };
 
-  const handleRollSiblings = () => {
+  const handleRollOlderSiblings = () => {
     if (!ageData || !ageData.age) {
       return;
     }
@@ -699,18 +705,14 @@ export default function FamilyDialog({
     setOlderLittersRoll(olderResult.littersRollData);
     setOlderLitters(olderResult.calculatedLitters);
 
-    // Roll for younger siblings (using apparent age)
-    const youngerResult = rollLittersHelper(formula.numberOfLitters, characterApparentAge);
-    setYoungerLittersRoll(youngerResult.littersRollData);
-    setYoungerLitters(youngerResult.calculatedLitters);
+    // Preserve existing younger siblings
+    const existingYoungerSiblings = siblings.filter(s => !s.isOlder);
 
-    // Generate siblings for each litter
-    const allSiblings = [];
+    // Generate new older siblings
+    const newOlderSiblings = [];
     let litterCounter = 1;
 
-    // Generate older siblings first
     for (let i = 0; i < olderResult.calculatedLitters; i++) {
-      // Calculate litter size
       const litterSize = evaluateLitterSize(formula.litterSize);
       
       // Calculate apparent age once per litter (all siblings in same litter have same apparent age)
@@ -719,12 +721,10 @@ export default function FamilyDialog({
       // Convert apparent age back to actual age (random value within the matching range)
       const siblingActualAge = Math.max(0, calculateActualAgeFromApparent(siblingApparentAge, raceCategory));
       
-      // Create siblings in this litter
       for (let j = 0; j < litterSize; j++) {
-        // Determine gender (roll for each sibling, not per litter)
         const gender = determineGender(formula.genderFormula);
         
-        allSiblings.push({
+        newOlderSiblings.push({
           litter: litterCounter,
           position: j + 1,
           age: siblingActualAge,
@@ -737,25 +737,54 @@ export default function FamilyDialog({
       litterCounter++;
     }
 
-    // Generate younger siblings
+    // Preserve younger siblings exactly as they are (they already have correct litter numbers)
+    // Combine: new older siblings + preserved younger siblings
+    const allSiblings = [...newOlderSiblings, ...existingYoungerSiblings];
+    setSiblings(allSiblings);
+  };
+
+  const handleRollYoungerSiblings = () => {
+    if (!ageData || !ageData.age) {
+      return;
+    }
+
+    const formula = getSiblingFormula();
+    const characterActualAge = ageData.age;
+
+    // Calculate character's apparent age from actual age
+    const characterApparentAge = calculateApparentAge(characterActualAge, raceCategory);
+
+    // Roll for younger siblings (using apparent age)
+    const youngerResult = rollLittersHelper(formula.numberOfLitters, characterApparentAge);
+    setYoungerLittersRoll(youngerResult.littersRollData);
+    setYoungerLitters(youngerResult.calculatedLitters);
+
+    // Preserve existing older siblings
+    const existingOlderSiblings = siblings.filter(s => s.isOlder);
+
+    // Find the maximum litter number from older siblings to continue numbering
+    const maxOlderLitter = existingOlderSiblings.length > 0
+      ? Math.max(...existingOlderSiblings.map(s => s.litter))
+      : 0;
+
+    // Generate new younger siblings
+    const newYoungerSiblings = [];
+    let litterCounter = maxOlderLitter + 1;
+
     for (let i = 0; i < youngerResult.calculatedLitters; i++) {
-      // Calculate litter size
       const litterSize = evaluateLitterSize(formula.litterSize);
       
       // Calculate apparent age once per litter (all siblings in same litter have same apparent age)
-      // Ensure age cannot be negative (minimum 0)
       const calculatedApparentAge = evaluateSiblingFormula(formula.youngerSiblingAgeFormula, characterApparentAge);
       const siblingApparentAge = Math.max(0, Math.floor(calculatedApparentAge || 0));
       
       // Convert apparent age back to actual age (random value within the matching range)
       const siblingActualAge = Math.max(0, calculateActualAgeFromApparent(siblingApparentAge, raceCategory));
       
-      // Create siblings in this litter
       for (let j = 0; j < litterSize; j++) {
-        // Determine gender (roll for each sibling, not per litter)
         const gender = determineGender(formula.genderFormula);
         
-        allSiblings.push({
+        newYoungerSiblings.push({
           litter: litterCounter,
           position: j + 1,
           age: siblingActualAge,
@@ -768,6 +797,8 @@ export default function FamilyDialog({
       litterCounter++;
     }
 
+    // Combine: preserved older siblings + new younger siblings
+    const allSiblings = [...existingOlderSiblings, ...newYoungerSiblings];
     setSiblings(allSiblings);
   };
 
@@ -797,65 +828,82 @@ export default function FamilyDialog({
     setRollResult(result);
     setParentStatus(status);
     setRollDetails(details);
+  };
 
-    // Calculate parent age for each living parent
+  const handleRollMotherAge = () => {
+    if (!ageData || !ageData.age || !parentStatus) {
+      return;
+    }
+
+    // Only allow rolling if mother is alive or father is unknown
+    if (parentStatus !== 'both parents alive' && parentStatus !== 'mother alive' && parentStatus !== 'father unknown') {
+      return;
+    }
+
+    const characterActualAge = ageData.age;
+    const characterApparentAge = calculateApparentAge(characterActualAge, raceCategory);
+
     // Find oldest sibling's apparent age (or use character's if no older siblings)
     let oldestSiblingOrCharacterApparentAge = characterApparentAge;
     if (siblings.length > 0) {
-      // Find oldest sibling (highest age)
       const oldestSibling = siblings.reduce((oldest, sibling) => {
         return sibling.age > oldest.age ? sibling : oldest;
       }, siblings[0]);
-      
-      // Convert oldest sibling's actual age to apparent age
       oldestSiblingOrCharacterApparentAge = calculateApparentAge(oldestSibling.age, raceCategory);
     }
 
-    // Calculate parent age using formula
     const parentAgeFormula = getParentAgeFormula();
+    const parentAgeCalculation = evaluateParentAgeFormula(parentAgeFormula, oldestSiblingOrCharacterApparentAge);
+    const parentApparentAge = Math.max(0, parentAgeCalculation.result);
+    const parentActualAge = Math.max(0, calculateActualAgeFromApparent(parentApparentAge, raceCategory));
     
-    // Calculate age for each living parent separately
-    const calculateParentAge = () => {
-      const parentAgeCalculation = evaluateParentAgeFormula(parentAgeFormula, oldestSiblingOrCharacterApparentAge);
-      const parentApparentAge = Math.max(0, parentAgeCalculation.result);
-      // Convert apparent age to actual age using the race category's formula or table
-      const parentActualAge = Math.max(0, calculateActualAgeFromApparent(parentApparentAge, raceCategory));
-      
-      return {
-        formula: parentAgeFormula,
-        baseAge: oldestSiblingOrCharacterApparentAge,
-        apparentAge: parentApparentAge,
-        actualAge: parentActualAge,
-        rollDetails: parentAgeCalculation.rollDetails
-      };
-    };
+    setMotherAgeResult({
+      formula: parentAgeFormula,
+      baseAge: oldestSiblingOrCharacterApparentAge,
+      apparentAge: parentApparentAge,
+      actualAge: parentActualAge,
+      rollDetails: parentAgeCalculation.rollDetails
+    });
+  };
 
-    // Calculate age for each living parent based on status
-    if (status === 'both parents alive' || status === 'mother alive') {
-      // Calculate mother's age
-      const motherAge = calculateParentAge();
-      setMotherAgeResult(motherAge);
-    } else {
-      setMotherAgeResult(null);
+  const handleRollFatherAge = () => {
+    if (!ageData || !ageData.age || !parentStatus) {
+      return;
     }
 
-    if (status === 'both parents alive' || status === 'father alive') {
-      // Calculate father's age
-      const fatherAge = calculateParentAge();
-      setFatherAgeResult(fatherAge);
-    } else {
-      setFatherAgeResult(null);
+    // Only allow rolling if father is alive
+    if (parentStatus !== 'both parents alive' && parentStatus !== 'father alive') {
+      return;
     }
 
+    const characterActualAge = ageData.age;
+    const characterApparentAge = calculateApparentAge(characterActualAge, raceCategory);
+
+    // Find oldest sibling's apparent age (or use character's if no older siblings)
+    let oldestSiblingOrCharacterApparentAge = characterApparentAge;
+    if (siblings.length > 0) {
+      const oldestSibling = siblings.reduce((oldest, sibling) => {
+        return sibling.age > oldest.age ? sibling : oldest;
+      }, siblings[0]);
+      oldestSiblingOrCharacterApparentAge = calculateApparentAge(oldestSibling.age, raceCategory);
+    }
+
+    const parentAgeFormula = getParentAgeFormula();
+    const parentAgeCalculation = evaluateParentAgeFormula(parentAgeFormula, oldestSiblingOrCharacterApparentAge);
+    const parentApparentAge = Math.max(0, parentAgeCalculation.result);
+    const parentActualAge = Math.max(0, calculateActualAgeFromApparent(parentApparentAge, raceCategory));
+    
+    setFatherAgeResult({
+      formula: parentAgeFormula,
+      baseAge: oldestSiblingOrCharacterApparentAge,
+      apparentAge: parentApparentAge,
+      actualAge: parentActualAge,
+      rollDetails: parentAgeCalculation.rollDetails
+    });
   };
 
   const handleRerollOlder = () => {
     if (!ageData || !ageData.age) {
-      return;
-    }
-
-    // Check if we need to consume a reroll token (first time only)
-    if (!olderRerollUsed && remainingRerolls <= 0) {
       return;
     }
 
@@ -865,7 +913,7 @@ export default function FamilyDialog({
     // Calculate character's apparent age from actual age
     const characterApparentAge = calculateApparentAge(characterActualAge, raceCategory);
 
-    // Consume a reroll token only on first use
+    // Consume a reroll token only on first use (if available)
     if (!olderRerollUsed && remainingRerolls > 0) {
       setRemainingRerolls(prev => prev - 1);
       setOlderRerollUsed(true);
@@ -920,18 +968,13 @@ export default function FamilyDialog({
       return;
     }
 
-    // Check if we need to consume a reroll token (first time only)
-    if (!youngerRerollUsed && remainingRerolls <= 0) {
-      return;
-    }
-
     const formula = getSiblingFormula();
     const characterActualAge = ageData.age;
 
     // Calculate character's apparent age from actual age
     const characterApparentAge = calculateApparentAge(characterActualAge, raceCategory);
 
-    // Consume a reroll token only on first use
+    // Consume a reroll token only on first use (if available)
     if (!youngerRerollUsed && remainingRerolls > 0) {
       setRemainingRerolls(prev => prev - 1);
       setYoungerRerollUsed(true);
@@ -992,12 +1035,7 @@ export default function FamilyDialog({
       return;
     }
 
-    // Check if we need to consume a reroll token (first time only)
-    if (!parentRerollUsed && remainingRerolls <= 0) {
-      return;
-    }
-
-    // Consume a reroll token only on first use
+    // Consume a reroll token only on first use (if available)
     if (!parentRerollUsed && remainingRerolls > 0) {
       setRemainingRerolls(prev => prev - 1);
       setParentRerollUsed(true);
@@ -1035,11 +1073,8 @@ export default function FamilyDialog({
                          familyTableRollResult !== null && 
                          was100Roll;
     
-    // If not free reroll, check if we have tokens
-    if (!isFreeReroll && remainingRerolls <= 0) return;
-    
-    // Only consume token if not free reroll
-    if (!isFreeReroll) {
+    // Only consume token if not free reroll and if available
+    if (!isFreeReroll && remainingRerolls > 0) {
       setRemainingRerolls(prev => prev - 1);
     }
     
@@ -1076,18 +1111,6 @@ export default function FamilyDialog({
   };
 
 
-  const handleFamilyTableUseFreeChoice = (result) => {
-    // Free choice - player selected an entry
-    if (result && result.entry && remainingFreeSelections > 0) {
-      setRemainingFreeSelections(prev => prev - 1);
-      setFamilyTableRollResult(result);
-      // Process effect if entry has one
-      if (result.entry?.effect) {
-        // TODO: Process effect using effectHandlers
-        console.log('Roll table effect:', result.entry.effect);
-      }
-    }
-  };
 
   const handleFamilyTableSecondaryRoll = () => {
     // Trigger opening the secondary roll view
@@ -1104,11 +1127,12 @@ export default function FamilyDialog({
   };
 
   const handleFamilyTableSecondaryReroll = async () => {
-    if (remainingRerolls <= 0) return;
+    // Only consume token if available
+    if (remainingRerolls > 0) {
+      setRemainingRerolls(prev => prev - 1);
+    }
     
-    setRemainingRerolls(prev => prev - 1);
-    
-    // Roll again on secondary table
+    // Roll again on secondary table (always allowed)
     if (familyTable) {
       const diceResult = rollDiceForTable(familyTable.dice || '1T100');
       const entry = findEntryInTable(diceResult.value, familyTable.entries);
@@ -1117,19 +1141,6 @@ export default function FamilyDialog({
         entry,
         diceDetails: diceResult.details
       });
-    }
-  };
-
-  const handleFamilyTableSecondaryUseFreeChoice = (result) => {
-    // Free choice - player selected an entry for secondary roll
-    if (result && result.entry && remainingFreeSelections > 0) {
-      setRemainingFreeSelections(prev => prev - 1);
-      setFamilyTableSecondaryRollResult(result);
-      // Process effect if entry has one
-      if (result.entry?.effect) {
-        // TODO: Process effect using effectHandlers
-        console.log('Secondary roll table effect:', result.entry.effect);
-      }
     }
   };
 
@@ -1186,30 +1197,6 @@ export default function FamilyDialog({
   };
 
   const handleConfirm = () => {
-    // Apply pending free choice if there is one for primary roll
-    let finalFamilyTableRoll = familyTableRollResult;
-    if (pendingFamilyTableFreeChoice && remainingFreeSelections > 0) {
-      finalFamilyTableRoll = pendingFamilyTableFreeChoice;
-      setRemainingFreeSelections(prev => prev - 1);
-      // Process effect if entry has one
-      if (pendingFamilyTableFreeChoice.entry?.effect) {
-        // TODO: Process effect using effectHandlers
-        console.log('Roll table effect:', pendingFamilyTableFreeChoice.entry.effect);
-      }
-    }
-    
-    // Apply pending free choice if there is one for secondary roll
-    let finalFamilyTableSecondaryRoll = familyTableSecondaryRollResult;
-    if (pendingFamilyTableSecondaryFreeChoice && remainingFreeSelections > 0) {
-      finalFamilyTableSecondaryRoll = pendingFamilyTableSecondaryFreeChoice;
-      setRemainingFreeSelections(prev => prev - 1);
-      // Process effect if entry has one
-      if (pendingFamilyTableSecondaryFreeChoice.entry?.effect) {
-        // TODO: Process effect using effectHandlers
-        console.log('Secondary roll table effect:', pendingFamilyTableSecondaryFreeChoice.entry.effect);
-      }
-    }
-    
     onConfirm({
       siblings: siblings,
       olderLitters: olderLitters,
@@ -1219,8 +1206,8 @@ export default function FamilyDialog({
       parentRollResult: rollResult,
       parentFormula: getParentFormula().formula,
       parentTable: getParentFormula().table,
-      familyTableRoll: finalFamilyTableRoll,
-      familyTableSecondaryRoll: finalFamilyTableSecondaryRoll
+      familyTableRoll: familyTableRollResult,
+      familyTableSecondaryRoll: familyTableSecondaryRollResult
     });
   };
 
@@ -1253,6 +1240,29 @@ export default function FamilyDialog({
               Syskon beräknas baserat på rasens kategori-formel. Antal kullar: {siblingFormula.numberOfLitters} (för äldre och yngre separat), Kullstorlek: {siblingFormula.litterSize}.
             </Alert>
 
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              {!olderLittersRoll && (
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={handleRollOlderSiblings}
+                  disabled={!ageData || !ageData.age}
+                >
+                  Slå äldre syskon
+                </Button>
+              )}
+              {!youngerLittersRoll && (
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={handleRollYoungerSiblings}
+                  disabled={!ageData || !ageData.age}
+                >
+                  Slå yngre syskon
+                </Button>
+              )}
+            </Box>
+
             {(olderLittersRoll || youngerLittersRoll) && (
               <Box sx={{ mb: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {olderLittersRoll && (
@@ -1261,21 +1271,24 @@ export default function FamilyDialog({
                       <Typography variant="subtitle2">
                         Äldre syskon: {siblingFormula.numberOfLitters}
                       </Typography>
-                      {(remainingRerolls > 0 || olderRerollUsed) && (
-                        <Tooltip title={
-                          olderRerollUsed 
-                            ? "Återkasta äldre syskon (gratis)" 
-                            : `Återkasta äldre syskon (${remainingRerolls} kvar)`
-                        }>
+                      <Tooltip title={
+                        olderRerollUsed 
+                          ? "Återkasta äldre syskon (gratis)" 
+                          : remainingRerolls > 0
+                            ? `Återkasta äldre syskon (${remainingRerolls} kvar)`
+                            : "Återkasta äldre syskon"
+                      }>
+                        <span>
                           <IconButton
                             size="small"
                             onClick={handleRerollOlder}
                             color="primary"
+                            disabled={!ageData || !ageData.age}
                           >
                             <RefreshIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
-                      )}
+                        </span>
+                      </Tooltip>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                       <Box>
@@ -1323,21 +1336,24 @@ export default function FamilyDialog({
                       <Typography variant="subtitle2">
                         Yngre syskon: {siblingFormula.numberOfLitters}
                       </Typography>
-                      {(remainingRerolls > 0 || youngerRerollUsed) && (
-                        <Tooltip title={
-                          youngerRerollUsed 
-                            ? "Återkasta yngre syskon (gratis)" 
-                            : `Återkasta yngre syskon (${remainingRerolls} kvar)`
-                        }>
+                      <Tooltip title={
+                        youngerRerollUsed 
+                          ? "Återkasta yngre syskon (gratis)" 
+                          : remainingRerolls > 0
+                            ? `Återkasta yngre syskon (${remainingRerolls} kvar)`
+                            : "Återkasta yngre syskon"
+                      }>
+                        <span>
                           <IconButton
                             size="small"
                             onClick={handleRerollYounger}
                             color="primary"
+                            disabled={!ageData || !ageData.age}
                           >
                             <RefreshIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
-                      )}
+                        </span>
+                      </Tooltip>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                       <Box>
@@ -1384,7 +1400,9 @@ export default function FamilyDialog({
             {siblings.length === 0 ? (
               <Box textAlign="center" py={4}>
                 <Typography variant="body1" color="text.secondary">
-                  Inga syskon beräknade. Klicka på återkastning för att rulla.
+                  {!(olderLittersRoll || youngerLittersRoll) 
+                    ? 'Klicka på "Slå syskon" för att rulla.' 
+                    : 'Inga syskon beräknade. Klicka på återkastning för att rulla igen.'}
                 </Typography>
               </Box>
             ) : (
@@ -1431,27 +1449,43 @@ export default function FamilyDialog({
                 <Alert severity="info" sx={{ mb: 2 }}>
                   Föräldrars status beräknas baserat på rasens kategori-formel: {parentConfig.formula.replace("characterApparentAge", "skenbar ålder")}</Alert>
 
+                {!rollDetails && (
+                  <Box sx={{ mb: 2 }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<RefreshIcon />}
+                      onClick={handleRollParents}
+                      disabled={!ageData || !ageData.age}
+                    >
+                      Slå föräldrar
+                    </Button>
+                  </Box>
+                )}
+
                 {rollDetails && (
                   <Paper variant="outlined" sx={{ p: 2 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                       <Typography variant="subtitle1">
                         Status
                       </Typography>
-                      {(remainingRerolls > 0 || parentRerollUsed) && (
-                        <Tooltip title={
-                          parentRerollUsed 
-                            ? "Återkasta (gratis)" 
-                            : `Återkasta (${remainingRerolls} kvar)`
-                        }>
+                      <Tooltip title={
+                        parentRerollUsed 
+                          ? "Återkasta (gratis)" 
+                          : remainingRerolls > 0
+                            ? `Återkasta (${remainingRerolls} kvar)`
+                            : "Återkasta"
+                      }>
+                        <span>
                           <IconButton
                             size="small"
                             onClick={handleRerollParents}
                             color="primary"
+                            disabled={!ageData || !ageData.age}
                           >
                             <RefreshIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
-                      )}
+                        </span>
+                      </Tooltip>
                     </Box>
 
                     <Box sx={{ mb: 2 }}>
@@ -1508,11 +1542,36 @@ export default function FamilyDialog({
 
                 {rollDetails ? (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {motherAgeResult && (
-                      <Paper variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                          Mors ålder
-                        </Typography>
+                    {(parentStatus === 'both parents alive' || parentStatus === 'mother alive' || parentStatus === 'father unknown') && (
+                      <>
+                        {!motherAgeResult && (
+                          <Box sx={{ mb: 2 }}>
+                            <Button
+                              variant="outlined"
+                              startIcon={<RefreshIcon />}
+                              onClick={handleRollMotherAge}
+                              disabled={!ageData || !ageData.age || !parentStatus}
+                            >
+                              Slå mors ålder
+                            </Button>
+                          </Box>
+                        )}
+                        {motherAgeResult && (
+                          <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                              <Typography variant="subtitle1">
+                                Mors ålder
+                              </Typography>
+                              <Tooltip title="Återkasta mors ålder">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setMotherAgeResult(null)}
+                                  color="primary"
+                                >
+                                  <RefreshIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
 
                         <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" color="text.secondary">
@@ -1540,14 +1599,41 @@ export default function FamilyDialog({
                         </Box>
 
                        
-                      </Paper>
+                          </Paper>
+                        )}
+                      </>
                     )}
 
-                    {fatherAgeResult && (
-                      <Paper variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                          Fars ålder
-                        </Typography>
+                    {(parentStatus === 'both parents alive' || parentStatus === 'father alive') && (
+                      <>
+                        {!fatherAgeResult && (
+                          <Box sx={{ mb: 2 }}>
+                            <Button
+                              variant="outlined"
+                              startIcon={<RefreshIcon />}
+                              onClick={handleRollFatherAge}
+                              disabled={!ageData || !ageData.age || !parentStatus}
+                            >
+                              Slå fars ålder
+                            </Button>
+                          </Box>
+                        )}
+                        {fatherAgeResult && (
+                          <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                              <Typography variant="subtitle1">
+                                Fars ålder
+                              </Typography>
+                              <Tooltip title="Återkasta fars ålder">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setFatherAgeResult(null)}
+                                  color="primary"
+                                >
+                                  <RefreshIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
 
                         <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" color="text.secondary">
@@ -1574,10 +1660,12 @@ export default function FamilyDialog({
                           </Box>
                         </Box>
 
-                      </Paper>
+                          </Paper>
+                        )}
+                      </>
                     )}
 
-                    {!motherAgeResult && !fatherAgeResult && (
+                    {parentStatus === 'both dead' && (
                       <Box textAlign="center" py={4}>
                         <Typography variant="body1" color="text.secondary">
                           Inga levande föräldrar.
@@ -1607,9 +1695,9 @@ export default function FamilyDialog({
               onReroll={handleFamilyTableReroll}
               onMinimize={() => setShowFamilyTableView(false)}
               rerolls={remainingRerolls}
-              freeChoiceTokens={remainingFreeSelections}
-              onUseFreeChoice={handleFamilyTableUseFreeChoice}
-              onPendingFreeChoiceChange={setPendingFamilyTableFreeChoice}
+              freeChoiceTokens={0}
+              onUseFreeChoice={null}
+              onPendingFreeChoiceChange={null}
               disabled={false}
               isSecondaryRoll={false}
               onSecondaryRoll={handleFamilyTableSecondaryRoll}
@@ -1626,9 +1714,9 @@ export default function FamilyDialog({
                   onReroll={handleFamilyTableSecondaryReroll}
                   onMinimize={() => setShowFamilyTableSecondaryView(false)}
                   rerolls={remainingRerolls}
-                  freeChoiceTokens={remainingFreeSelections}
-                  onUseFreeChoice={handleFamilyTableSecondaryUseFreeChoice}
-                  onPendingFreeChoiceChange={setPendingFamilyTableSecondaryFreeChoice}
+                  freeChoiceTokens={0}
+                  onUseFreeChoice={null}
+                  onPendingFreeChoiceChange={null}
                   disabled={false}
                   isSecondaryRoll={true}
                 />
@@ -1656,24 +1744,10 @@ export default function FamilyDialog({
                 }}
                 onView={() => setShowFamilyTableView(true)}
                 rollResult={familyTableRollResult}
-                rerolls={(() => {
-                  // Check if original roll was 100
-                  if (familyTableRollResult && familyTable && familyTable.entries) {
-                    const maxEntry = familyTable.entries.reduce((max, entry) => 
-                      entry.maxValue > max.maxValue ? entry : max
-                    );
-                    const was100Roll = familyTableRollResult.rollValue >= maxEntry.minValue && 
-                                      familyTableRollResult.rollValue <= maxEntry.maxValue;
-                    // If 100 was rolled and free reroll not used, show at least 1
-                    if (was100Roll && !familyTableFreeRerollUsed) {
-                      return Math.max(remainingRerolls, 1);
-                    }
-                  }
-                  return remainingRerolls;
-                })()}
+                rerolls={Math.max(remainingRerolls, 1)}
                 onReroll={handleFamilyTableReroll}
-                freeChoiceTokens={remainingFreeSelections}
-                onUseFreeChoice={handleFamilyTableUseFreeChoice}
+                freeChoiceTokens={0}
+                onUseFreeChoice={null}
                 disabled={false}
               />
             ) : null}

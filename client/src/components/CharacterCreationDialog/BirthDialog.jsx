@@ -61,7 +61,10 @@ export default function BirthDialog({
     }
   }, [worldSettings.defaultCalendar]);
 
-  // Load background data
+  // Track if saved state has been loaded to prevent re-loading
+  const savedStateLoadedRef = useRef(false);
+
+  // Load background data (only once)
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -88,9 +91,13 @@ export default function BirthDialog({
     };
 
     loadData();
-    
-    // Load saved state
-    if (savedState) {
+  }, []);
+
+  // Load saved state (only once when dialog opens with saved state)
+  useEffect(() => {
+    if (savedState && !savedStateLoadedRef.current) {
+      isLoadingSavedStateRef.current = true;
+      
       if (savedState.primitiveRoll) setPrimitiveRoll(savedState.primitiveRoll);
       if (savedState.selectedPrimitive !== undefined) setSelectedPrimitive(savedState.selectedPrimitive);
       if (savedState.primitiveDescription) setPrimitiveDescription(savedState.primitiveDescription);
@@ -102,6 +109,18 @@ export default function BirthDialog({
       if (savedState.selectedWeek !== undefined) setSelectedWeek(savedState.selectedWeek);
       if (savedState.usePrimitive !== undefined) setUsePrimitive(savedState.usePrimitive);
       if (savedState.selectedCalendar) setSelectedCalendar(savedState.selectedCalendar);
+      
+      savedStateLoadedRef.current = true;
+      
+      // Allow state saving after a brief delay to ensure all state updates are complete
+      setTimeout(() => {
+        isLoadingSavedStateRef.current = false;
+      }, 100);
+    }
+    // Reset flag when dialog closes (savedState becomes null)
+    if (!savedState) {
+      savedStateLoadedRef.current = false;
+      isLoadingSavedStateRef.current = false;
     }
   }, [savedState]);
   
@@ -111,8 +130,16 @@ export default function BirthDialog({
     onStateChangeRef.current = onStateChange;
   }, [onStateChange]);
 
+  // Track if we're currently loading saved state to prevent saving during load
+  const isLoadingSavedStateRef = useRef(false);
+
   useEffect(() => {
-    if (onStateChangeRef.current && backgroundData) {
+    // Don't save state while we're loading saved state
+    if (isLoadingSavedStateRef.current) {
+      return;
+    }
+    
+    if (onStateChangeRef.current) {
       const stateToSave = {
         birthState: {
           primitiveRoll,
@@ -130,7 +157,7 @@ export default function BirthDialog({
       };
       onStateChangeRef.current(stateToSave);
     }
-  }, [primitiveRoll, selectedPrimitive, primitiveDescription, monthRoll, selectedMonth, dayRoll, selectedDay, weekRoll, selectedWeek, usePrimitive, selectedCalendar, backgroundData]);
+  }, [primitiveRoll, selectedPrimitive, primitiveDescription, monthRoll, selectedMonth, dayRoll, selectedDay, weekRoll, selectedWeek, usePrimitive, selectedCalendar]);
 
   // Update primitive description when selection changes
   useEffect(() => {
@@ -138,20 +165,6 @@ export default function BirthDialog({
       setPrimitiveDescription(selectedPrimitive.description);
     }
   }, [selectedPrimitive]);
-
-  // Auto-roll month when dialog opens (if no saved state)
-  useEffect(() => {
-    if (backgroundData && !monthRoll && !loading && !savedState) {
-      // Roll month first
-      const monthRollResult = rollT100WithDetails();
-      setMonthRoll(monthRollResult);
-      const months = backgroundData?.civilized?.months || [];
-      const month = months.find(m => monthRollResult.value >= m.min && monthRollResult.value <= m.max);
-      if (month) {
-        setSelectedMonth(month);
-      }
-    }
-  }, [backgroundData, monthRoll, loading, savedState]);
 
   // No automatic rolling - user must press roll buttons
 
@@ -208,28 +221,11 @@ export default function BirthDialog({
     const week = weeks.find(w => roll >= w.min && roll <= w.max);
     if (week) {
       setSelectedWeek(week);
-    }
-    
-    // If week is 9-10, use primitive
-    if (roll >= 9 && roll <= 10) {
-      setUsePrimitive(true);
-      // Auto-roll primitive
-      const primitiveRollResult = rollT100WithDetails();
-      setPrimitiveRoll(primitiveRollResult);
-      const primitiveTable = backgroundData?.primitive?.table || [];
-      const primitiveEntry = primitiveTable.find(e => primitiveRollResult.value >= e.min && primitiveRollResult.value <= e.max);
-      if (primitiveEntry) {
-        setSelectedPrimitive(primitiveEntry);
+      // If week is 9-10, set usePrimitive flag (user must roll primitive manually)
+      if (roll >= 9 && roll <= 10) {
+        setUsePrimitive(true);
       }
-    } else {
-      // If week is not 9-10, roll day
-      const dayRollResult = rollT10();
-      setDayRoll(dayRollResult);
-      const weekdays = backgroundData?.civilized?.weekdays || [];
-      const day = weekdays.find(w => dayRollResult >= w.min && dayRollResult <= w.max);
-      if (day) {
-        setSelectedDay(day);
-      }
+      // If week is not 9-10, user must roll day manually
     }
   };
 
@@ -520,35 +516,20 @@ export default function BirthDialog({
                                   setSelectedWeek(week);
                                   // Set weekRoll to match the selected value for display
                                   setWeekRoll(week.min);
-                                  // If week is 9-10, trigger primitive
+                                  // If week is 9-10, set usePrimitive flag (user must roll primitive manually)
                                   if (week.min >= 9 && week.min <= 10) {
                                     setUsePrimitive(true);
                                     // Reset day
                                     setDayRoll(null);
                                     setSelectedDay(null);
-                                    // Auto-roll primitive
-                                    const primitiveRollResult = rollT100WithDetails();
-                                    setPrimitiveRoll(primitiveRollResult);
-                                    const primitiveTable = backgroundData?.primitive?.table || [];
-                                    const primitiveEntry = primitiveTable.find(e => primitiveRollResult.value >= e.min && primitiveRollResult.value <= e.max);
-                                    if (primitiveEntry) {
-                                      setSelectedPrimitive(primitiveEntry);
-                                    }
                                   } else {
                                     setUsePrimitive(false);
                                     setPrimitiveRoll(null);
                                     setSelectedPrimitive(null);
                                     setPrimitiveDescription('');
-                                    // Roll day if not already rolled
-                                    if (!dayRoll) {
-                                      const dayRollResult = rollT10();
-                                      setDayRoll(dayRollResult);
-                                      const weekdays = backgroundData?.civilized?.weekdays || [];
-                                      const day = weekdays.find(w => dayRollResult >= w.min && dayRollResult <= w.max);
-                                      if (day) {
-                                        setSelectedDay(day);
-                                      }
-                                    }
+                                    // Reset day - user must roll manually
+                                    setDayRoll(null);
+                                    setSelectedDay(null);
                                   }
                                 }}
                                 value={`${week.min}-${week.max}`}

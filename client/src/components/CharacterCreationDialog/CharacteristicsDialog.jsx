@@ -129,7 +129,7 @@ export default function CharacteristicsDialog({
   }, [onStateChange]);
 
   useEffect(() => {
-    if (onStateChangeRef.current && characteristicsData) {
+    if (onStateChangeRef.current) {
       const stateToSave = {
         characteristicsState: {
           characteristics,
@@ -138,7 +138,7 @@ export default function CharacteristicsDialog({
       };
       onStateChangeRef.current(stateToSave);
     }
-  }, [characteristics, specializations, characteristicsData]);
+  }, [characteristics, specializations]);
 
   const handleRoll = (characteristicKey) => {
     const rolls = rollT6Multiple(3);
