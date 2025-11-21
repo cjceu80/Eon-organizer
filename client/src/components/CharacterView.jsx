@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import { useAuth } from '../hooks/useAuth';
 import {
   Box,
@@ -13,8 +14,6 @@ import {
   CircularProgress,
   Alert,
   IconButton,
-  Chip,
-  Divider,
   Accordion,
   AccordionSummary,
   AccordionDetails
@@ -38,6 +37,12 @@ function TabPanel({ children, value, index, ...other }) {
     </div>
   );
 }
+
+TabPanel.propTypes = {
+  children: PropTypes.node.isRequired,
+  value: PropTypes.number.isRequired,
+  index: PropTypes.number.isRequired
+};
 
 export default function CharacterView() {
   const { characterId } = useParams();
@@ -240,7 +245,7 @@ export default function CharacterView() {
 
         <TabPanel value={activeTab} index={0}>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Ålder"
                 type="number"
@@ -250,7 +255,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Kön"
                 fullWidth
@@ -259,7 +264,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Ras"
                 fullWidth
@@ -268,7 +273,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Yrke"
                 fullWidth
@@ -277,7 +282,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Längd (cm)"
                 type="number"
@@ -287,7 +292,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Vikt (kg)"
                 type="number"
@@ -297,7 +302,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Kroppsbyggnad"
                 fullWidth
@@ -306,7 +311,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Hår"
                 fullWidth
@@ -315,7 +320,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Ögon"
                 fullWidth
@@ -324,7 +329,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Hud"
                 fullWidth
@@ -333,7 +338,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Hem"
                 fullWidth
@@ -342,7 +347,7 @@ export default function CharacterView() {
                 disabled={!isEditing}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 label="Religion"
                 fullWidth
@@ -357,7 +362,7 @@ export default function CharacterView() {
         <TabPanel value={activeTab} index={1}>
           <Grid container spacing={2}>
             {['STY', 'TÅL', 'RÖR', 'PER', 'PSY', 'VIL', 'BIL', 'SYN', 'HÖR'].map(attr => (
-              <Grid item xs={6} sm={4} md={3} key={attr}>
+              <Grid size={{ xs: 6, sm: 4, md: 3 }} key={attr}>
                 <TextField
                   label={attr}
                   type="number"
@@ -374,7 +379,7 @@ export default function CharacterView() {
         <TabPanel value={activeTab} index={2}>
           <Grid container spacing={2}>
             {['Lojalitet', 'Heder', 'Amor', 'Aggression', 'Tro', 'Generositet', 'Rykte', 'Tur', 'Qadosh'].map(char => (
-              <Grid item xs={12} sm={6} key={char}>
+              <Grid size={{ xs: 12, sm: 6 }} key={char}>
                 <Box>
                   <TextField
                     label={char}
@@ -429,7 +434,7 @@ export default function CharacterView() {
               {(displayChar.professionalSkills || []).map((skill, index) => (
                 <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                   <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={4}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         label="Namn"
                         fullWidth
@@ -438,7 +443,7 @@ export default function CharacterView() {
                         disabled={!isEditing}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={3}>
+                    <Grid size={{ xs: 12, sm: 3 }}>
                       <TextField
                         label="Nivå"
                         type="number"
@@ -448,7 +453,7 @@ export default function CharacterView() {
                         disabled={!isEditing}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={4}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         label="Specialisering"
                         fullWidth
@@ -458,7 +463,7 @@ export default function CharacterView() {
                       />
                     </Grid>
                     {isEditing && (
-                      <Grid item xs={12} sm={1}>
+                      <Grid size={{ xs: 12, sm: 1 }}>
                         <Button
                           color="error"
                           onClick={() => removeArrayItem('professionalSkills', index)}
@@ -490,7 +495,7 @@ export default function CharacterView() {
               {(displayChar.otherSkills || []).map((skill, index) => (
                 <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                   <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={4}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         label="Namn"
                         fullWidth
@@ -499,7 +504,7 @@ export default function CharacterView() {
                         disabled={!isEditing}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={3}>
+                    <Grid size={{ xs: 12, sm: 3 }}>
                       <TextField
                         label="Nivå"
                         type="number"
@@ -509,7 +514,7 @@ export default function CharacterView() {
                         disabled={!isEditing}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={4}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         label="Specialisering"
                         fullWidth
@@ -519,7 +524,7 @@ export default function CharacterView() {
                       />
                     </Grid>
                     {isEditing && (
-                      <Grid item xs={12} sm={1}>
+                      <Grid size={{ xs: 12, sm: 1 }}>
                         <Button
                           color="error"
                           onClick={() => removeArrayItem('otherSkills', index)}
@@ -551,7 +556,7 @@ export default function CharacterView() {
               {(displayChar.languages || []).map((lang, index) => (
                 <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                   <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
                         label="Språk"
                         fullWidth
@@ -560,7 +565,7 @@ export default function CharacterView() {
                         disabled={!isEditing}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={5}>
+                    <Grid size={{ xs: 12, sm: 5 }}>
                       <TextField
                         label="Nivå"
                         type="number"
@@ -571,7 +576,7 @@ export default function CharacterView() {
                       />
                     </Grid>
                     {isEditing && (
-                      <Grid item xs={12} sm={1}>
+                      <Grid size={{ xs: 12, sm: 1 }}>
                         <Button
                           color="error"
                           onClick={() => removeArrayItem('languages', index)}

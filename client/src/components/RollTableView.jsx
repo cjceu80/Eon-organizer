@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
   Paper,
@@ -22,6 +22,7 @@ import MinimizeIcon from '@mui/icons-material/Minimize';
 import StarIcon from '@mui/icons-material/Star';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { rollT100WithDetails, rollT6Multiple, rollT10, rollObT6WithDetails } from '../utils/dice';
+import { useAuth } from '../hooks/useAuth';
 
 /**
  * Parse dice notation and roll
@@ -121,11 +122,28 @@ export default function RollTableView({
   disabled = false,
   isSecondaryRoll = false,
   onSecondaryRoll = null,
-  isFreeReroll = false
+  isFreeReroll = false,
+  subTableRollResult: externalSubTableRollResult = null,
+  onSubTableRollChange = null
 }) {
   const [loading, setLoading] = useState(false);
   const [freeChoiceMode, setFreeChoiceMode] = useState(false);
   const [pendingFreeChoiceEntry, setPendingFreeChoiceEntry] = useState(null);
+  const [subTable, setSubTable] = useState(null);
+  const [subTableLoading, setSubTableLoading] = useState(false);
+  const [internalSubTableRollResult, setInternalSubTableRollResult] = useState(null);
+  const { token } = useAuth();
+
+  // Use external subTableRollResult if provided, otherwise use internal state
+  const subTableRollResult = externalSubTableRollResult !== null ? externalSubTableRollResult : internalSubTableRollResult;
+  
+  const setSubTableRollResult = (value) => {
+    if (onSubTableRollChange) {
+      onSubTableRollChange(value);
+    } else {
+      setInternalSubTableRollResult(value);
+    }
+  };
 
   if (!table) {
     return (
@@ -197,12 +215,39 @@ export default function RollTableView({
   };
 
   const handleEntryClick = (entry) => {
-    if (freeChoiceMode && !disabled) {
-      setPendingFreeChoiceEntry(entry);
+    if (disabled) return;
+    
+    // Ensure we have the full entry object from the table (with all properties including subTable)
+    const fullEntry = table.entries?.find(e => 
+      e.minValue === entry.minValue && e.maxValue === entry.maxValue
+    ) || entry;
+    
+    console.log('RollTableView - handleEntryClick:', {
+      entry,
+      fullEntry,
+      hasSubTable: !!fullEntry.subTable,
+      subTable: fullEntry.subTable
+    });
+    
+    if (freeChoiceMode) {
+      // Free choice mode: set pending selection
+      setPendingFreeChoiceEntry(fullEntry);
       if (onPendingFreeChoiceChange) {
         onPendingFreeChoiceChange({
           rollValue: null,
-          entry,
+          entry: fullEntry,
+          diceDetails: null,
+          isFreeChoice: true
+        });
+      }
+    } else {
+      // Manual selection: apply immediately by calling onRoll with the selected entry
+      // Calculate a roll value that would match this entry (use the middle of the range)
+      const rollValue = Math.floor((fullEntry.minValue + fullEntry.maxValue) / 2);
+      if (onRoll) {
+        onRoll({
+          rollValue,
+          entry: fullEntry, // Use fullEntry to ensure all properties are included
           diceDetails: null,
           isFreeChoice: true
         });
@@ -212,6 +257,103 @@ export default function RollTableView({
 
   const isRolled = rollResult !== null;
   const rolledEntry = rollResult?.entry;
+
+  // Find the full entry from the table (to ensure we have all properties including subTable)
+  const fullRolledEntry = rolledEntry && table?.entries ? 
+    table.entries.find(e => 
+      e.minValue === rolledEntry.minValue && e.maxValue === rolledEntry.maxValue
+    ) || rolledEntry
+    : rolledEntry;
+
+  // Fetch sub table when entry with subTable is rolled
+  useEffect(() => {
+    const fetchSubTable = async () => {
+      // Use fullRolledEntry to ensure we have all properties
+      const entryToCheck = fullRolledEntry || rolledEntry;
+      
+      // Debug logging
+      console.log('RollTableView - Checking for subTable:', {
+        hasRolledEntry: !!rolledEntry,
+        hasFullRolledEntry: !!fullRolledEntry,
+        hasSubTable: !!entryToCheck?.subTable,
+        subTable: entryToCheck?.subTable,
+        entry: entryToCheck,
+        tableEntries: table?.entries?.length
+      });
+
+      if (!entryToCheck?.subTable) {
+        setSubTable(null);
+        setSubTableRollResult(null);
+        return;
+      }
+
+      // Check if subTable is a reference (has tableSlug)
+      if (entryToCheck.subTable.tableSlug) {
+        console.log('RollTableView - Fetching referenced sub table:', entryToCheck.subTable.tableSlug);
+        setSubTableLoading(true);
+        try {
+          const response = await fetch(`/api/roll-tables/${entryToCheck.subTable.tableSlug}`, {
+            headers: token ? {
+              'Authorization': `Bearer ${token}`
+            } : {}
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('RollTableView - Fetched sub table:', data.table);
+            setSubTable(data.table);
+          } else {
+            console.error('Failed to fetch sub table:', response.status, response.statusText);
+            setSubTable(null);
+          }
+        } catch (error) {
+          console.error('Error fetching sub table:', error);
+          setSubTable(null);
+        } finally {
+          setSubTableLoading(false);
+        }
+      } else if (entryToCheck.subTable.entries && Array.isArray(entryToCheck.subTable.entries)) {
+        // Inline sub table (can have name or type: "inline")
+        console.log('RollTableView - Using inline sub table:', entryToCheck.subTable);
+        // Ensure the inline table has a name for display
+        const inlineTable = {
+          ...entryToCheck.subTable,
+          name: entryToCheck.subTable.name || entryToCheck.subTable.value || 'Undertabell',
+          dice: entryToCheck.subTable.dice || '1T100'
+        };
+        setSubTable(inlineTable);
+      } else {
+        console.warn('RollTableView - subTable exists but has invalid structure:', entryToCheck.subTable);
+        setSubTable(null);
+      }
+    };
+
+    fetchSubTable();
+  }, [fullRolledEntry, rolledEntry, token, table]);
+
+  const handleSubTableRoll = async () => {
+    if (!subTable || disabled || loading) return;
+    
+    setLoading(true);
+    try {
+      const diceResult = rollDice(subTable.dice || '1T100');
+      const entry = findEntry(diceResult.value, subTable.entries);
+      
+      setSubTableRollResult({
+        rollValue: diceResult.value,
+        entry,
+        diceDetails: diceResult.details
+      });
+    } catch (error) {
+      console.error('Error rolling sub table:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubTableReroll = async () => {
+    await handleSubTableRoll();
+  };
 
   return (
     <Paper variant="outlined" sx={{ p: 3 }}>
@@ -326,6 +468,144 @@ export default function RollTableView({
         </Alert>
       )}
 
+      {/* Sub Table */}
+      {isRolled && (fullRolledEntry?.subTable || rolledEntry?.subTable) && (
+        <Box sx={{ mt: 3, mb: 3 }}>
+          {subTableLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : subTable ? (
+            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Undertabell: {subTable.name || 'Undertabell'}
+              </Typography>
+              
+              {subTable.description && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {subTable.description}
+                </Typography>
+              )}
+
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                {!subTableRollResult ? (
+                  <Button
+                    variant="contained"
+                    startIcon={<CasinoIcon />}
+                    onClick={handleSubTableRoll}
+                    disabled={disabled || loading}
+                  >
+                    Slå på undertabell
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={handleSubTableReroll}
+                    disabled={disabled || loading}
+                  >
+                    Slå om på undertabell
+                  </Button>
+                )}
+                {loading && <CircularProgress size={24} />}
+              </Box>
+
+              {subTableRollResult && subTableRollResult.entry && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                    Slag: {subTableRollResult.rollValue} - {subTableRollResult.entry.value}
+                  </Typography>
+                  {subTableRollResult.entry.description && (
+                    <Typography variant="body2">
+                      {subTableRollResult.entry.description}
+                    </Typography>
+                  )}
+                </Alert>
+              )}
+
+              <TableContainer>
+                <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ width: '100px' }}><strong>Värde</strong></TableCell>
+                      <TableCell sx={{ width: '250px' }}><strong>Resultat</strong></TableCell>
+                      <TableCell><strong>Beskrivning</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {subTable.entries && subTable.entries.map((entry, index) => {
+                      const isRolledEntry = subTableRollResult && subTableRollResult.entry &&
+                        entry.minValue === subTableRollResult.entry.minValue &&
+                        entry.maxValue === subTableRollResult.entry.maxValue;
+                      
+                      return (
+                        <TableRow
+                          key={`${entry.minValue}-${entry.maxValue}`}
+                          onClick={() => {
+                            if (!disabled) {
+                              const rollValue = Math.floor((entry.minValue + entry.maxValue) / 2);
+                              setSubTableRollResult({
+                                rollValue,
+                                entry,
+                                diceDetails: null,
+                                isFreeChoice: true
+                              });
+                            }
+                          }}
+                          sx={{
+                            bgcolor: isRolledEntry ? 'action.selected' : (index % 2 === 0 ? 'background.paper' : 'action.hover'),
+                            cursor: !disabled ? 'pointer' : 'default',
+                            '&:hover': {
+                              bgcolor: !disabled ? (isRolledEntry ? 'action.selected' : 'action.hover') : undefined
+                            },
+                            '&:active': {
+                              bgcolor: !disabled ? 'action.selected' : undefined
+                            }
+                          }}
+                        >
+                          <TableCell sx={{ width: '100px', whiteSpace: 'nowrap' }}>
+                            {entry.minValue === entry.maxValue
+                              ? entry.minValue
+                              : `${entry.minValue}-${entry.maxValue}`}
+                          </TableCell>
+                          <TableCell sx={{ width: '250px' }}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: isRolledEntry ? 'bold' : 'normal',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {entry.value}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical'
+                              }}
+                            >
+                              {entry.description || ''}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          ) : null}
+        </Box>
+      )}
+
       {/* Table */}
       <TableContainer>
         <Table size="small" sx={{ tableLayout: 'fixed' }}>
@@ -346,7 +626,10 @@ export default function RollTableView({
                 entry.minValue === pendingFreeChoiceEntry.minValue &&
                 entry.maxValue === pendingFreeChoiceEntry.maxValue;
               
-              const isSelectable = freeChoiceMode && !disabled;
+              const isSelectable = !disabled;
+              
+              // Check if this entry has a subTable (for visual indication)
+              const hasSubTable = !!entry.subTable;
               
               let bgColor;
               if (isRolledEntry && !freeChoiceMode) {
@@ -360,10 +643,17 @@ export default function RollTableView({
               return (
                 <TableRow 
                   key={`${entry.minValue}-${entry.maxValue}`}
-                  onClick={() => handleEntryClick(entry)}
+                  onClick={() => {
+                    // Make sure we pass the full entry object with all properties
+                    console.log('RollTableView - Entry clicked:', entry);
+                    handleEntryClick(entry);
+                  }}
                   sx={{
                     bgcolor: bgColor,
                     cursor: isSelectable ? 'pointer' : 'default',
+                    '&:active': {
+                      bgcolor: isSelectable ? 'action.selected' : undefined
+                    },
                     height: '48px',
                     '&:hover': {
                       bgcolor: isSelectable 

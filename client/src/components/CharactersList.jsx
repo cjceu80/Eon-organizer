@@ -84,7 +84,7 @@ export default function CharactersList() {
         <Box>
           <Grid container spacing={3}>
             {characters.map(character => (
-              <Grid item xs={12} sm={6} md={4} key={character.id || character._id}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={character.id || character._id}>
                 <Card
                   component={Link}
                   to={`/character/${character.id || character._id}`}

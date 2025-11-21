@@ -256,7 +256,7 @@ export default function PlayersTab({ worldId, world }) {
       ) : (
         <Grid container spacing={3}>
           {characters.map(character => (
-            <Grid item xs={12} sm={6} md={4} key={character._id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={character._id}>
               <Card 
                 component={Link}
                 to={`/character/${character._id}`}

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Card,
@@ -17,15 +16,11 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
  * Shows roll/view buttons and displays result when rolled
  */
 export default function RollTableCard({
-  tableSlug,
   tableName,
   onRoll,
   onView,
   rollResult = null,
-  rerolls = 0,
   onReroll = null,
-  freeChoiceTokens = 0,
-  onUseFreeChoice = null,
   disabled = false
 }) {
   const hasRolled = rollResult !== null;
@@ -118,10 +113,7 @@ RollTableCard.propTypes = {
     rollValue: PropTypes.number.isRequired,
     entry: PropTypes.object
   }),
-  rerolls: PropTypes.number,
   onReroll: PropTypes.func,
-  freeChoiceTokens: PropTypes.number,
-  onUseFreeChoice: PropTypes.func,
   disabled: PropTypes.bool
 };
 

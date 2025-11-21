@@ -13,7 +13,6 @@ import {
   Grid,
   Card,
   CardContent,
-  CardActions,
   Chip,
   Divider,
   Stack,
@@ -37,12 +36,11 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CasinoIcon from '@mui/icons-material/Casino';
-import RaceSelectionDialog from './RaceSelectionDialog';
-import AgeCalculationDialog from './AgeCalculationDialog';
-import CharacteristicsDialogItem from './CharacteristicsDialogItem';
-import BirthDialog from './BirthDialog';
-import FamilyDialog from './FamilyDialog';
-import DiceRollDisplay from '../DiceRollDisplay';
+import RaceSelectionDialog from './RaceSelectionDialog/RaceSelectionDialog';
+import AgeCalculationDialog from './AgeCalculationDialog/AgeCalculationDialog';
+import CharacteristicsDialogItem from './CharectaristicsDialog/CharacteristicsDialogItem';
+import BirthDialog from './BirthDialog/BirthDialog';
+import FamilyDialog from './FamilyDialog/FamilyDialog';
 import { rollT6Multiple } from '../../utils/dice';
 
 function TabPanel({ children, value, index }) {
@@ -52,6 +50,11 @@ function TabPanel({ children, value, index }) {
     </div>
   );
 }
+TabPanel.propTypes = {
+  children: PropTypes.node.isRequired,
+  value: PropTypes.number.isRequired,
+  index: PropTypes.number.isRequired
+};
 
 export default function CharacterCreationDialog({ 
   open,
@@ -61,6 +64,9 @@ export default function CharacterCreationDialog({
   token,
   onConfirm
 }) {
+  // Storage key for this dialog's state
+  const storageKey = `characterCreation_${worldId}`;
+  
   const [characterName, setCharacterName] = useState('');
   const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -197,6 +203,113 @@ export default function CharacterCreationDialog({
   const [ageCalculationDialogState, setAgeCalculationDialogState] = useState(null);
   const [birthDialogState, setBirthDialogState] = useState(null);
   const [familyDialogState, setFamilyDialogState] = useState(null);
+
+  // Load saved state from localStorage when dialog opens
+  useEffect(() => {
+    if (open) {
+      try {
+        const savedState = localStorage.getItem(storageKey);
+        if (savedState) {
+          const parsed = JSON.parse(savedState);
+          if (parsed.characterName) setCharacterName(parsed.characterName);
+          if (parsed.basics) setBasics(parsed.basics);
+          if (parsed.attributes) setAttributes(parsed.attributes);
+          if (parsed.attributeRolls) setAttributeRolls(parsed.attributeRolls);
+          if (parsed.anpassadSets) setAnpassadSets(parsed.anpassadSets);
+          if (parsed.selectedAnpassadSet) setSelectedAnpassadSet(parsed.selectedAnpassadSet);
+          if (parsed.characteristics) setCharacteristics(parsed.characteristics);
+          if (parsed.characteristicRolls) setCharacteristicRolls(parsed.characteristicRolls);
+          if (parsed.specializations) setSpecializations(parsed.specializations);
+          if (parsed.professionalSkills) setProfessionalSkills(parsed.professionalSkills);
+          if (parsed.otherSkills) setOtherSkills(parsed.otherSkills);
+          if (parsed.languages) setLanguages(parsed.languages);
+          if (parsed.connections) setConnections(parsed.connections);
+          if (parsed.bio) setBio(parsed.bio);
+          if (parsed.selectedRace) {
+            setSelectedRace(parsed.selectedRace);
+            // Fetch race category again when loading saved race
+            fetchRaceCategory(parsed.selectedRace);
+          }
+          if (parsed.ageData) setAgeData(parsed.ageData);
+          if (parsed.backgroundData) setBackgroundData(parsed.backgroundData);
+          if (parsed.familyData) setFamilyData(parsed.familyData);
+          if (parsed.gender) setGender(parsed.gender);
+          if (parsed.activeTab !== undefined) setActiveTab(parsed.activeTab);
+          if (parsed.ageCalculationDialogState) setAgeCalculationDialogState(parsed.ageCalculationDialogState);
+          if (parsed.birthDialogState) setBirthDialogState(parsed.birthDialogState);
+          if (parsed.familyDialogState) setFamilyDialogState(parsed.familyDialogState);
+        }
+      } catch (err) {
+        console.error('Error loading saved state:', err);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, storageKey]);
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    if (open) {
+      try {
+        const stateToSave = {
+          characterName,
+          basics,
+          attributes,
+          attributeRolls,
+          anpassadSets,
+          selectedAnpassadSet,
+          characteristics,
+          characteristicRolls,
+          specializations,
+          professionalSkills,
+          otherSkills,
+          languages,
+          connections,
+          bio,
+          selectedRace,
+          ageData,
+          backgroundData,
+          familyData,
+          raceCategory,
+          gender,
+          activeTab,
+          ageCalculationDialogState,
+          birthDialogState,
+          familyDialogState
+        };
+        localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+      } catch (err) {
+        console.error('Error saving state:', err);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    open,
+    characterName,
+    basics,
+    attributes,
+    attributeRolls,
+    anpassadSets,
+    selectedAnpassadSet,
+    characteristics,
+    characteristicRolls,
+    specializations,
+    professionalSkills,
+    otherSkills,
+    languages,
+    connections,
+    bio,
+    selectedRace,
+    ageData,
+    backgroundData,
+    familyData,
+    raceCategory,
+    gender,
+    activeTab,
+    ageCalculationDialogState,
+    birthDialogState,
+    familyDialogState,
+    storageKey
+  ]);
 
   // Fetch race category when race is selected
   const fetchRaceCategory = async (race) => {
@@ -463,11 +576,17 @@ export default function CharacterCreationDialog({
 
       if (response.ok) {
         const data = await response.json();
+        // Clear localStorage on successful creation
+        try {
+          localStorage.removeItem(storageKey);
+        } catch (err) {
+          console.error('Error clearing saved state:', err);
+        }
         if (onConfirm) {
           onConfirm(data.character);
         }
         // Reset form
-        handleClose();
+        handleCancel();
       } else {
         const errorData = await response.json();
         alert(errorData.message || 'Misslyckades att skapa karaktär');
@@ -529,6 +648,13 @@ export default function CharacterCreationDialog({
     setBirthDialogState(null);
     setFamilyDialogState(null);
     
+    // Clear localStorage
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (err) {
+      console.error('Error clearing saved state:', err);
+    }
+    
     onClose();
   };
 
@@ -584,8 +710,8 @@ export default function CharacterCreationDialog({
                 </Box>
 
                 <TabPanel value={activeTab} index={0}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
+                  <Grid container spacing={1.5}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Ras"
@@ -604,7 +730,7 @@ export default function CharacterCreationDialog({
                         }}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Kön"
@@ -622,7 +748,7 @@ export default function CharacterCreationDialog({
                         <option value="Obestämt" />
                       </datalist>
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Ålder"
@@ -640,7 +766,7 @@ export default function CharacterCreationDialog({
                         helperText={ageData?.age ? 'Använd verktyget för att ändra' : ''}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Yrke"
@@ -650,7 +776,7 @@ export default function CharacterCreationDialog({
                         disabled={creating}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Längd (cm)"
@@ -668,7 +794,7 @@ export default function CharacterCreationDialog({
                         helperText={ageData?.length ? 'Använd verktyget för att ändra' : ''}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Vikt (kg)"
@@ -686,7 +812,7 @@ export default function CharacterCreationDialog({
                         helperText={ageData?.weight ? 'Använd verktyget för att ändra' : ''}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Kroppsbyggnad"
@@ -697,7 +823,7 @@ export default function CharacterCreationDialog({
                         helperText={ageData?.kroppsbyggnad ? 'Använd verktyget för att ändra' : ''}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Hår"
@@ -707,7 +833,7 @@ export default function CharacterCreationDialog({
                         disabled={creating}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Ögon"
@@ -717,7 +843,7 @@ export default function CharacterCreationDialog({
                         disabled={creating}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Hud"
@@ -727,7 +853,7 @@ export default function CharacterCreationDialog({
                         disabled={creating}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Hem"
@@ -737,7 +863,7 @@ export default function CharacterCreationDialog({
                         disabled={creating}
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         margin="dense"
                         label="Religion"
@@ -769,7 +895,7 @@ export default function CharacterCreationDialog({
                         }}
                         disabled={creating}
                       >
-                        Rulla alla
+                        Slå alla
           </Button>
                     </Box>
                   )}
@@ -789,10 +915,9 @@ export default function CharacterCreationDialog({
                       const storedValue = attributes[attr];
                       const baseValue = storedValue !== undefined && storedValue !== null ? storedValue : '';
                       const displayValue = baseValue;
-                      const finalValue = baseValue !== '' && baseValue !== null && baseValue !== undefined && typeof baseValue === 'number' ? baseValue + raceModifier : '';
 
   return (
-                        <Grid item xs={12} sm={6} md={4} key={attr}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={attr}>
                           <Box
                             onDragOver={(e) => {
                               if (world?.settings?.statRollMethod === 'anpassad') {
@@ -1131,7 +1256,7 @@ export default function CharacterCreationDialog({
                           </Box>
                           {anpassadSets.length === 0 ? (
                             <Typography variant="body2" color="text.secondary">
-                              Klicka på "Rulla alla" för att skapa värden som kan tilldelas attribut.
+                              Klicka på &quot;Rulla alla&quot; för att skapa värden som kan tilldelas attribut.
                             </Typography>
                           ) : (
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -1257,7 +1382,6 @@ export default function CharacterCreationDialog({
                                     <TableRow>
                                       <TableCell><strong>Karaktärsdrag</strong></TableCell>
                                       <TableCell align="right"><strong>Värde</strong></TableCell>
-                                      <TableCell align="center"><strong>Åtgärder</strong></TableCell>
                                     </TableRow>
                                   </TableHead>
                                   <TableBody>
@@ -1319,7 +1443,6 @@ export default function CharacterCreationDialog({
                                     <TableRow>
                                       <TableCell><strong>Karaktärsdrag</strong></TableCell>
                                       <TableCell align="right"><strong>Värde</strong></TableCell>
-                                      <TableCell align="center"><strong>Åtgärder</strong></TableCell>
                                     </TableRow>
                                   </TableHead>
                                   <TableBody>
@@ -1388,7 +1511,7 @@ export default function CharacterCreationDialog({
                       {professionalSkills.map((skill, index) => (
                         <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                           <Grid container spacing={2} alignItems="center">
-                            <Grid item xs={12} sm={4}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
                               <TextField
                                 label="Namn"
                                 fullWidth
@@ -1398,7 +1521,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={3}>
+                            <Grid size={{ xs: 12, sm: 3 }}>
                               <TextField
                                 label="Nivå"
                                 type="number"
@@ -1409,7 +1532,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
                               <TextField
                                 label="Specialisering"
                                 fullWidth
@@ -1419,7 +1542,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={1}>
+                            <Grid size={{ xs: 12, sm: 1 }}>
                               <IconButton
                                 color="error"
                                 onClick={() => removeSkill('professional', index)}
@@ -1451,7 +1574,7 @@ export default function CharacterCreationDialog({
                       {otherSkills.map((skill, index) => (
                         <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                           <Grid container spacing={2} alignItems="center">
-                            <Grid item xs={12} sm={4}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
                               <TextField
                                 label="Namn"
                                 fullWidth
@@ -1461,7 +1584,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={3}>
+                            <Grid size={{ xs: 12, sm: 3 }}>
                               <TextField
                                 label="Nivå"
                                 type="number"
@@ -1472,7 +1595,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
                               <TextField
                                 label="Specialisering"
                                 fullWidth
@@ -1482,7 +1605,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={1}>
+                            <Grid size={{ xs: 12, sm: 1 }}>
                               <IconButton
                                 color="error"
                                 onClick={() => removeSkill('other', index)}
@@ -1514,7 +1637,7 @@ export default function CharacterCreationDialog({
                       {languages.map((lang, index) => (
                         <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                           <Grid container spacing={2} alignItems="center">
-                            <Grid item xs={12} sm={6}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
                                 label="Språk"
               fullWidth
@@ -1524,7 +1647,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={5}>
+                            <Grid size={{ xs: 12, sm: 5 }}>
                               <TextField
                                 label="Nivå"
                                 type="number"
@@ -1535,7 +1658,7 @@ export default function CharacterCreationDialog({
                                 disabled={creating}
                               />
                             </Grid>
-                            <Grid item xs={12} sm={1}>
+                            <Grid size={{ xs: 12, sm: 1 }}>
                               <IconButton
                                 color="error"
                                 onClick={() => removeLanguage(index)}
@@ -1564,7 +1687,7 @@ export default function CharacterCreationDialog({
                   {connections.map((conn, index) => (
                     <Box key={index} mb={2} p={2} border={1} borderColor="divider" borderRadius={1}>
                       <Grid container spacing={2}>
-                        <Grid item xs={12} sm={4}>
+                        <Grid size={{ xs: 12, sm: 4 }}>
                           <TextField
                             label="ID"
                             fullWidth
@@ -1574,7 +1697,7 @@ export default function CharacterCreationDialog({
                             disabled={creating}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={4}>
+                        <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
                             label="Relation"
               fullWidth
@@ -1584,7 +1707,7 @@ export default function CharacterCreationDialog({
                             disabled={creating}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={3}>
+                        <Grid size={{ xs: 12, sm: 3 }}>
                           <TextField
                             label="Beskrivning"
                             fullWidth
@@ -1594,7 +1717,7 @@ export default function CharacterCreationDialog({
                             disabled={creating}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={1}>
+                        <Grid size={{ xs: 12, sm: 1 }}>
                           <IconButton
                             color="error"
                             onClick={() => removeConnection(index)}
